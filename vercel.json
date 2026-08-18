@@ -1,0 +1,17 @@
+{
+  "version": 2,
+  "build": {
+    "env": {
+      "PYTHON_VERSION": "3.12"
+    }
+  },
+  "functions": {
+    "api/index.py": {
+      "runtime": "python3.12",
+      "maxDuration": 30
+    }
+  },
+  "rewrites": [
+    { "source": "/(.*)", "destination": "/api" }
+  ]
+}

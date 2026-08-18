@@ -1,0 +1,14 @@
+runtime/
+__pycache__/
+*.pyc
+*.db
+*.db.bak*
+启动.bat
+.vercel
+.workbuddy/
+*.log
+.write_test
+ablls_structure.json
+ablls_text.txt
+r3_ability.docx
+r3_ability.pdf

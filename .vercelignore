@@ -1,0 +1,7 @@
+runtime/
+__pycache__/
+*.pyc
+*.db
+*.db.bak*
+启动.bat
+.workbuddy/

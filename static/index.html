@@ -1,0 +1,1472 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>语言与学习技能评估系统</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --bg: #f5f7fa; --panel: #ffffff; --line: #e3e8ef; --text: #1f2933;
+    --muted: #66727f; --primary: #2f6fed; --primary-d: #1f54c4; --ok: #1faa59;
+    --warn: #e8a33d; --soft: #eef3ff;
+  }
+  body { font-family: -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif;
+         background: var(--bg); color: var(--text); font-size: 14px; }
+  header { background: linear-gradient(90deg,#2f6fed,#5b8def); color:#fff;
+           padding: 14px 22px; display:flex; align-items:center; justify-content:space-between; }
+  header h1 { font-size: 18px; font-weight: 600; }
+  header .sub { font-size: 12px; opacity: .85; }
+  .layout { display: grid; grid-template-columns: 260px 1fr 320px; gap: 14px; padding: 14px; height: calc(100vh - 56px); }
+  .panel { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; overflow:auto; }
+  .panel h2 { font-size: 13px; font-weight: 600; padding: 12px 14px; border-bottom: 1px solid var(--line);
+              background: #fafbfc; position: sticky; top: 0; }
+  /* sidebar */
+  .btn { background: var(--primary); color:#fff; border:none; border-radius:7px; padding:8px 12px;
+         cursor:pointer; font-size:13px; }
+  .btn:hover { background: var(--primary-d); }
+  .btn.ghost { background:#fff; color:var(--primary); border:1px solid var(--primary); }
+  .btn.sm { padding:5px 9px; font-size:12px; }
+  .list-item { padding: 10px 14px; border-bottom:1px solid var(--line); cursor:pointer; }
+  .list-item:hover { background: var(--soft); }
+  .list-item.active { background: var(--soft); border-left:3px solid var(--primary); }
+  .list-item .t { font-weight: 500; }
+  .list-item .m { font-size: 12px; color: var(--muted); margin-top:2px; }
+  /* 被评估者目录（状态分类） */
+  .client-dir { display:flex; flex-wrap:wrap; gap:6px; padding:10px 10px 4px; }
+  .dir-pill { font-size:12px; padding:4px 10px; border-radius:12px; border:1px solid var(--line);
+              background:#fff; color:var(--muted); cursor:pointer; }
+  .dir-pill.active { background:var(--primary); color:#fff; border-color:var(--primary); }
+  .dir-pill .cnt { opacity:.7; margin-left:3px; }
+  .c-status { display:inline-block; font-size:11px; padding:1px 7px; border-radius:10px;
+              background:var(--soft); color:var(--primary-d); margin-left:6px; vertical-align:middle; cursor:pointer; }
+  .c-status:hover { background:var(--primary); color:#fff; }
+  .c-status.none { background:#eee; color:#999; }
+  /* 快速选标签浮层 */
+  .status-picker { position:absolute; background:#fff; border:1px solid var(--line); border-radius:8px;
+                   box-shadow:0 6px 20px rgba(0,0,0,.12); z-index:60; min-width:120px; padding:4px 0; }
+  .status-picker div { padding:6px 14px; cursor:pointer; font-size:12px; }
+  .status-picker div:hover { background:var(--soft); }
+  .status-picker .divider { border-top:1px solid var(--line); margin:4px 0; }
+  /* 右键操作菜单（客户项） */
+  .ctx-menu { position:fixed; background:#fff; border:1px solid var(--line); border-radius:10px;
+              box-shadow:0 8px 28px rgba(0,0,0,.15); z-index:70; min-width:150px; padding:4px 0; font-size:13px; }
+  .ctx-menu .ctx-item { padding:8px 16px; cursor:pointer; display:flex; gap:8px; align-items:center;
+                        transition:background .12s; }
+  .ctx-menu .ctx-item:hover { background:var(--soft); }
+  .ctx-menu .ctx-item.danger { color:#e2554f; }
+  .ctx-menu .ctx-item.danger:hover { background:#fef2f2; }
+  .ctx-menu .ctx-divider { height:1px; background:var(--line); margin:4px 0; }
+  /* main */
+  .toolbar { display:flex; gap:10px; align-items:center; padding:10px 14px; border-bottom:1px solid var(--line); flex-wrap:wrap; }
+  .domain-block { padding: 8px 14px; }
+  .domain-title { font-size:14px; font-weight:600; color:var(--primary-d); margin:10px 0 6px;
+                  display:flex; justify-content:space-between; align-items:center; }
+  .domain-title .bar { font-size:12px; color:var(--muted); }
+  .item { border:1px solid var(--line); border-radius:8px; padding:10px 12px; margin-bottom:8px; }
+  .item .head { display:flex; justify-content:space-between; gap:10px; align-items:center; }
+  .item .sp-title { font-weight:600; font-size:14px; color:var(--text); display:flex; justify-content:space-between; align-items:center; gap:8px; flex:1; }
+  .item .sp-title .code { font-weight:600; color:var(--primary); background:var(--soft); padding:1px 7px; border-radius:5px; font-size:12px; white-space:nowrap; }
+  .item .desc { font-size:12.5px; color:#475569; margin-top:3px; }
+  .item .max { font-size:12px; color:var(--muted); white-space:nowrap; }
+  .item .crit { margin-top:7px; font-size:12px; color:#475569; background:#f8fafc; border-radius:6px; padding:7px 9px; }
+  .item .crit .lv { display:inline-block; min-width:18px; font-weight:600; color:var(--primary-d); }
+  .scores { margin-top:9px; display:flex; gap:6px; flex-wrap:wrap; }
+  .scores button { border:1px solid var(--line); background:#fff; border-radius:6px; padding:5px 0; width:38px; cursor:pointer; font-size:13px; }
+  .scores button.sel { background:var(--primary); color:#fff; border-color:var(--primary); }
+  .scores button:hover { border-color: var(--primary); }
+  .prog { height:8px; background:#eef2f7; border-radius:5px; overflow:hidden; margin-top:6px; }
+  .prog > i { display:block; height:100%; background:var(--primary); transition:width .2s; }
+  .rated-info { font-size:11.5px; color:var(--muted); margin-top:5px; }
+  .domain-title .pct { color: var(--primary-d); font-weight:600; }
+  /* age filter bar */
+  .agebar { display:flex; align-items:center; gap:12px; flex-wrap:wrap; padding:8px 14px;
+            border-bottom:1px solid var(--line); background:#fbfcfe; font-size:12px; }
+  .age-info { font-weight:600; color:var(--primary-d); }
+  .seg { display:inline-flex; border:1px solid var(--line); border-radius:7px; overflow:hidden; }
+  .seg .segbtn { border:none; background:#fff; padding:5px 11px; cursor:pointer; font-size:12px; color:var(--muted); }
+  .seg .segbtn.active { background:var(--primary); color:#fff; }
+  .legend { color:var(--muted); display:inline-flex; align-items:center; gap:5px; margin-left:auto; }
+  .legend .dot { width:9px; height:9px; border-radius:50%; display:inline-block; margin-left:4px; }
+  .dot.main { background:var(--primary); }
+  .dot.ext { background:var(--warn); }
+  .tag { font-size:10.5px; padding:1px 6px; border-radius:8px; margin-left:6px; white-space:nowrap; }
+  .tag.main { background:#e7f0ff; color:var(--primary-d); }
+  .tag.ext { background:#fdf1dc; color:#a86a16; }
+  .item.ext { background:#fffdf8; border-left:3px solid var(--warn); }
+  .list-item.archived { opacity:.55; }
+  /* right summary */
+  .sum-card { padding: 14px; border-bottom:1px solid var(--line); }
+  .big { font-size: 28px; font-weight: 700; color: var(--primary-d); }
+  .big small { font-size:13px; color:var(--muted); font-weight:400; }
+  .ring { text-align:center; padding: 6px 0; }
+  table.dd { width:100%; border-collapse:collapse; font-size:12px; }
+  table.dd td { padding:5px 8px; border-bottom:1px solid var(--line); }
+  table.dd td.r { text-align:right; color:var(--muted); }
+  /* 右侧领域行可点击跳转 */
+  .dom-row { cursor:pointer; transition:background .15s; }
+  .dom-row:hover { background:var(--soft); }
+  .dom-link { color:var(--primary); font-weight:600; border-bottom:1px dashed var(--primary); }
+  .dom-row:hover .dom-link { border-bottom-style:solid; }
+  /* 左侧领域高亮（scrollToDomain 时短暂闪烁） */
+  .domain-block.dom-highlight { outline:2px solid var(--primary); outline-offset:-1px;
+    box-shadow:0 0 0 4px rgba(47,111,237,.12); border-radius:8px; transition:outline .3s,box-shadow .3s; }
+  .modal { position:fixed; inset:0; background:rgba(15,23,42,.45); display:none; align-items:center; justify-content:center; z-index:50; }
+  .modal.show { display:flex; }
+  .modal .box { background:#fff; border-radius:12px; padding:20px; width:400px; max-width:92vw; }
+  .modal .box h3 { margin-bottom:12px; }
+  .modal label { display:block; font-size:12px; color:var(--muted); margin:10px 0 4px; }
+  .modal input, .modal select, .modal textarea { width:100%; padding:8px; border:1px solid var(--line); border-radius:7px; font-size:13px; }
+  .modal .row { display:flex; gap:10px; justify-content:flex-end; margin-top:16px; }
+  .empty { color:var(--muted); text-align:center; padding:40px 10px; }
+  .pill { display:inline-block; font-size:11px; background:var(--soft); color:var(--primary-d); padding:1px 7px; border-radius:10px; }
+  /* 评估页底部状态栏（自动保存，无需手动保存按钮） */
+  .ass-footer { display:flex; gap:8px; align-items:center; padding:10px 14px; margin-top:6px;
+               border-top:1px solid var(--line); background:#fafbfc; position:sticky; bottom:0; z-index:2; font-size:12px; }
+  .ass-footer .status-text { flex:1; color:var(--muted); }
+  .ass-footer .status-text.ok { color:var(--ok); }
+  .ass-footer .status-text.dirty { color:#e2554f; }
+  .ass-footer .status-text.pending { color:var(--warn); }
+  .ass-footer .btn-xs { padding:3px 10px; font-size:11.5px; border-radius:6px; background:none; color:var(--muted); border:1px solid var(--line); cursor:pointer; }
+  .ass-footer .btn-xs:hover { color:var(--primary); border-color:var(--primary); }
+  .ass-footer .btn-xs:disabled { opacity:.35; cursor:not-allowed; }
+  /* 登录/注册遮罩 */
+  #authMask { position:fixed; inset:0; background:linear-gradient(135deg,#1f3a8a,#2f6fed); display:none; align-items:center; justify-content:center; z-index:200; }
+  #authMask .card { background:#fff; border-radius:14px; padding:28px 26px; width:360px; max-width:92vw; box-shadow:0 18px 50px rgba(0,0,0,.3); }
+  #authMask h2 { font-size:18px; margin-bottom:4px; color:var(--text); }
+  #authMask .desc { font-size:12px; color:var(--muted); margin-bottom:16px; }
+  #authMask label { display:block; font-size:12px; color:var(--muted); margin:12px 0 4px; }
+  #authMask input { width:100%; padding:9px 10px; border:1px solid var(--line); border-radius:8px; font-size:14px; }
+  #authMask .tabs { display:flex; gap:8px; margin-bottom:6px; }
+  #authMask .tabs button { flex:1; padding:8px; border:1px solid var(--line); background:#fff; border-radius:8px; cursor:pointer; font-size:13px; color:var(--muted); }
+  #authMask .tabs button.active { background:var(--primary); color:#fff; border-color:var(--primary); }
+  #authMask .err { color:#e2554f; font-size:12px; min-height:16px; margin-top:8px; }
+  #authMask .submit { width:100%; margin-top:14px; padding:10px; font-size:14px; }
+  #authMask .hint { font-size:11px; color:var(--muted); margin-top:10px; text-align:center; }
+  /* 顶栏右侧用户区 */
+  header .userbox { display:none; align-items:center; gap:10px; font-size:13px; }
+  header .userbox .uname { opacity:.95; }
+  header .userbox a.btn, header .userbox button.btn { padding:6px 10px; font-size:12px; }
+</style>
+</head>
+<body>
+<header>
+  <div>
+    <h1>语言与学习技能评估系统</h1>
+    <div class="sub">23 个领域 · 450 个技能项 · 理论满分 1192 分</div>
+  </div>
+  <div class="userbox" id="userbox">
+    <span class="uname" id="uname"></span>
+    <a class="btn ghost" id="adminLink" href="/admin" style="display:none">🛠 管理后台</a>
+    <button class="btn ghost" onclick="doLogout()">退出</button>
+  </div>
+  <button class="btn ghost" onclick="showClientModal()">+ 新增被评估者</button>
+</header>
+
+<div class="layout">
+  <!-- 左侧：被评估者 & 评估 -->
+  <div class="panel">
+    <h2>被评估者</h2>
+    <div class="client-dir" id="clientDir"></div>
+    <div style="padding:6px 10px 8px;border-bottom:1px solid var(--line); display:flex; gap:6px;">
+      <button class="btn sm ghost" onclick="showProgress()" id="progBtn" disabled style="flex:1">📈 成长曲线</button>
+      <button class="btn sm ghost" id="tagBtn" onclick="showTagModal()" title="管理目录标签（新增/改名/删除，仅管理员）">⚙ 目录</button>
+    </div>
+    <div id="clientList"></div>
+  </div>
+
+  <!-- 中间：评估录入 -->
+  <div class="panel">
+    <div class="toolbar">
+      <button class="btn sm" onclick="showAssessmentModal()" id="newAssBtn" disabled>+ 新建评估</button>
+      <select id="assSelect" onchange="loadAssessment()" disabled style="padding:6px;border-radius:7px;border:1px solid var(--line);"></select>
+      <span id="assMeta" class="pill" style="display:none"></span>
+      <span style="flex:1"></span>
+      <button class="btn sm ghost" onclick="exportReport('docx')" id="expDocx" disabled>导出Word</button>
+      <button class="btn sm ghost" onclick="exportReport('pdf')" id="expPdf" disabled>导出PDF</button>
+      <button class="btn sm ghost" onclick="showAbility()" id="abilityBtn" disabled>🧠 能力年龄</button>
+      <button class="btn sm ghost" onclick="showSuggestions()" id="suggBtn" disabled>📋 干预建议</button>
+      <button class="btn sm ghost" onclick="showReportPreview()" id="prevBtn" disabled>📄 报告预览</button>
+    </div>
+    <div class="agebar" id="ageBar" style="display:none">
+      <span id="ageInfo" class="age-info"></span>
+      <span class="seg">
+        <button class="segbtn active" data-f="all" onclick="setAgeFilter('all')">全部项目</button>
+        <button class="segbtn" data-f="main" onclick="setAgeFilter('main')">仅主评估</button>
+        <button class="segbtn" data-f="ext" onclick="setAgeFilter('ext')">仅拓展评估</button>
+      </span>
+      <span class="legend"><i class="dot main"></i>主评估(适配≤年龄+3月) <i class="dot ext"></i>拓展(超龄)</span>
+    </div>
+    <div id="scaleArea">
+      <div class="empty">请选择左侧被评估者，并新建 / 选择一次评估后开始打分。</div>
+    </div>
+  </div>
+
+  <!-- 右侧：结果汇总 -->
+  <div class="panel">
+    <h2>评估结果汇总</h2>
+    <div id="summaryArea">
+      <div class="empty">尚未评分</div>
+    </div>
+  </div>
+</div>
+
+<!-- 弹窗：被评估者 -->
+<div class="modal" id="clientModal">
+  <div class="box">
+    <h3 id="clientModalTitle">新增被评估者</h3>
+    <label>姓名 *</label><input id="c_name" placeholder="如：小明">
+    <label>性别</label>
+    <select id="c_gender"><option value="">未知</option><option>男</option><option>女</option></select>
+    <label>出生日期</label><input id="c_birth" type="date">
+    <label>目录（状态分类）</label>
+    <select id="c_status"><option value="">— 未分类 —</option></select>
+    <label>备注</label><textarea id="c_note" rows="2"></textarea>
+    <div class="row">
+      <button class="btn ghost" onclick="hideModal('clientModal')">取消</button>
+      <button class="btn" onclick="submitClient()">保存</button>
+    </div>
+  </div>
+</div>
+
+<!-- 弹窗：管理目录标签 -->
+<div class="modal" id="tagModal">
+  <div class="box">
+    <h3>管理目录标签</h3>
+    <p style="font-size:12px;color:var(--muted);margin:0 0 8px">用于对被评估者分类（如 在读/离校/意向）。可新增、改名、删除；改名会同步更新已分类的被评估者。</p>
+    <div id="tagList" style="display:flex;flex-direction:column;gap:6px;margin-bottom:10px"></div>
+    <div style="display:flex;gap:6px;margin-bottom:6px">
+      <input id="newTag" placeholder="新增标签，如：试读" style="flex:1">
+      <button class="btn sm" onclick="addTag()">+ 新增</button>
+    </div>
+    <div class="row">
+      <button class="btn ghost" onclick="hideModal('tagModal')">关闭</button>
+    </div>
+  </div>
+</div>
+
+<!-- 弹窗：评估 -->
+<div class="modal" id="assModal">
+  <div class="box">
+    <h3>新建评估记录</h3>
+    <label>评估标题</label><input id="a_title" placeholder="如：初次评估 / 三个月复查">
+    <label>评估员</label><input id="a_assessor" placeholder="评估员姓名">
+    <label>评估日期</label><input id="a_date" type="date">
+    <div class="row">
+      <button class="btn ghost" onclick="hideModal('assModal')">取消</button>
+      <button class="btn" onclick="createAssessment()">创建</button>
+    </div>
+  </div>
+</div>
+
+<!-- 弹窗：成长曲线 -->
+<div class="modal" id="progModal">
+  <div class="box" style="width:760px;max-width:94vw">
+    <h3>成长曲线（多次评估对比）</h3>
+    <div id="progSummary" class="pill" style="margin-bottom:10px"></div>
+    <div style="max-height:60vh;overflow:auto">
+      <div style="margin-bottom:16px">
+        <b>总分得分率趋势</b>
+        <canvas id="totalLine" height="120"></canvas>
+      </div>
+      <div>
+        <b>各维度得分率趋势</b>
+        <div id="domainPick" style="margin:6px 0"></div>
+        <canvas id="domainLine" height="260"></canvas>
+      </div>
+    </div>
+    <div class="row">
+      <button class="btn ghost" onclick="hideModal('progModal')">关闭</button>
+    </div>
+  </div>
+</div>
+
+<!-- 弹窗：能力年龄评估 -->
+<div class="modal" id="abilityModal">
+  <div class="box" style="width:780px;max-width:94vw">
+    <h3>各维度能力年龄评估</h3>
+    <div id="abilitySummary" class="pill" style="margin-bottom:10px"></div>
+    <div style="max-height:58vh;overflow:auto">
+      <table id="abilityTable" style="width:100%;border-collapse:collapse;font-size:13px">
+        <thead>
+          <tr style="background:var(--primary);color:#fff;text-align:left">
+            <th style="padding:6px 8px">领域</th>
+            <th style="padding:6px 8px;text-align:center">能力年龄</th>
+            <th style="padding:6px 8px;text-align:center">实际年龄</th>
+            <th style="padding:6px 8px;text-align:center">结论</th>
+            <th style="padding:6px 8px;text-align:center">基本掌握/定龄项</th>
+            <th style="padding:6px 8px">判定说明</th>
+          </tr>
+        </thead>
+        <tbody id="abilityBody"></tbody>
+      </table>
+      <div style="margin-top:10px;color:var(--muted);font-size:12px;line-height:1.6">
+        <b>判定方法（分级·参考大模型临床经验）：</b>某项目得分率 ≥ <span id="abThr">80%</span> 记为「基本掌握」，
+        0&lt;得分率&lt;80% 为临界/部分掌握；沿月龄轴取「连续基本掌握」的最远点，对紧随其后的临界项按得分率线性插值得到连续能力年龄；
+        未评分项不计入。与实际年龄相差 ±3 个月内视为「符合年龄」，超出即「超前/滞后」。综合能力年龄取各维度最低值（更保守）。
+      </div>
+    </div>
+    <div class="row">
+      <button class="btn ghost" onclick="hideModal('abilityModal')">关闭</button>
+    </div>
+  </div>
+</div>
+
+<!-- 弹窗：干预建议 -->
+<div class="modal" id="suggModal">
+  <div class="box" style="width:880px;max-width:95vw">
+    <h3>干预建议（与导出报告一致）</h3>
+    <div id="suggSummary" class="pill" style="margin-bottom:10px"></div>
+    <div style="max-height:60vh;overflow:auto">
+      <div id="suggIntro" style="color:var(--muted);font-size:12px;line-height:1.7;margin-bottom:10px"></div>
+      <table id="suggOverview" style="width:100%;border-collapse:collapse;font-size:13px;margin-bottom:14px">
+        <thead>
+          <tr style="background:var(--primary);color:#fff;text-align:left">
+            <th style="padding:6px 8px">优先度</th>
+            <th style="padding:6px 8px">领域</th>
+            <th style="padding:6px 8px;text-align:center">能力年龄</th>
+            <th style="padding:6px 8px;text-align:center">实际年龄</th>
+            <th style="padding:6px 8px;text-align:center">滞后(月)</th>
+            <th style="padding:6px 8px;text-align:center">未达标项(临界)</th>
+          </tr>
+        </thead>
+        <tbody id="suggOverviewBody"></tbody>
+      </table>
+      <div id="suggDetail"></div>
+    </div>
+    <div class="row">
+      <button class="btn ghost" onclick="hideModal('suggModal')">关闭</button>
+    </div>
+  </div>
+</div>
+</div>
+
+<!-- 登录/注册遮罩 -->
+<div id="authMask">
+  <div class="card">
+    <h2 id="authTitle">登录</h2>
+    <div class="desc" id="authDesc">登录后使用评估系统</div>
+    <div class="tabs">
+      <button id="tabLogin" class="active" onclick="switchAuth('login')">登录</button>
+      <button id="tabReg" onclick="switchAuth('reg')">注册</button>
+    </div>
+    <label>用户名</label>
+    <input id="authUser" placeholder="用户名（至少 3 位，字母/数字/下划线）" autocomplete="username">
+    <label>密码</label>
+    <input id="authPwd" type="password" placeholder="密码（至少 6 位）" autocomplete="current-password">
+    <div class="err" id="authErr"></div>
+    <button class="btn submit" id="authSubmit" onclick="submitAuth()">登录</button>
+    <div class="hint" id="authHint"></div>
+  </div>
+</div>
+
+<script>
+let SCALE = null;
+let clients = [];
+let archivedClients = [];  // 已归档被评估者（独立于 clients，仅归档视图使用，供右键菜单/查看查找）
+let curClient = null;
+let curAssessment = null;
+let scores = {};        // code -> score (本次编辑缓存)
+let dirty = false;
+let editHistory = [];    // 会话内改分历史栈：{code, prev}，用于跨自动保存的多步撤销
+let lastSavedAt = null;  // 上次保存时间
+let _autoTimer = null;   // 自动保存防抖计时器
+let clientMonths = null;   // 当前被评估者实际月龄（按出生日期算）
+let adaptMonths = null;    // 主评估适配月龄（实际月龄向上取整到 3 月边界，并延伸到最近的适配阶段）
+let ALL_AGES = [];         // 年龄映射中出现过的去重月龄（升序），用于计算适配阶段
+let clientTags = [];       // 目录标签列表（如 在读/离校/意向），可新增/改名/删除
+let clientFilter = '全部';  // 当前被评估者面板目录筛选
+let ageFilter = 'all';     // all | main | ext
+
+async function api(url, opts = {}) {
+  opts.headers = opts.headers || {};
+  const tok = getToken();
+  if (tok) opts.headers['Authorization'] = 'Bearer ' + tok;
+  const r = await fetch(url, opts);
+  if (r.status === 401) {
+    clearToken();
+    showAuth();
+    throw new Error('登录已过期，请重新登录');
+  }
+  if (!r.ok) { const e = await r.json().catch(()=>({})); throw new Error(e.error || '请求失败'); }
+  return r.json();
+}
+
+async function loadScale() {
+  SCALE = await api('/api/scale');
+  // 收集所有出现过的技能项月龄（去重升序），供“3 个月跨度”适配阶段计算
+  const set = new Set();
+  for (const dom of SCALE.domains) for (const it of dom.items) {
+    if (it.age != null) set.add(it.age);
+  }
+  ALL_AGES = [...set].sort((a, b) => a - b);
+}
+
+async function loadClients() {
+  clients = await api('/api/clients');
+  if (!clientTags.length) await loadClientTags();
+  renderClientDir();
+  const el = document.getElementById('clientList');
+  const list = clientFilter === '全部'
+    ? clients
+    : clients.filter(c => (c.status || '') === clientFilter);
+  if (!clients.length) {
+    el.innerHTML = '<div class="empty">暂无被评估者，点击右上角「+ 新增被评估者」</div>';
+    return;
+  }
+  if (!list.length) {
+    el.innerHTML = `<div class="empty">「${esc(clientFilter)}」目录下暂无被评估者</div>`;
+    return;
+  }
+  el.innerHTML = list.map(c => {
+    const st = c.status || '';
+    const badge = st ? `<span class="c-status" data-cid="${c.id}" data-status="${esc(st)}">${esc(st)}</span>`
+                     : `<span class="c-status none" data-cid="${c.id}" data-status="">未分类</span>`;
+    return `<div class="list-item ${curClient && curClient.id === c.id ? 'active' : ''}"
+              onclick="selectClient(${c.id})" oncontextmenu="showCtxMenu(event, ${c.id})">
+      <div class="t">${esc(c.name)} ${badge}</div>
+      <div class="m">${c.gender || ''} ${c.birth_date || ''}</div>
+    </div>`;
+  }).join('');
+}
+
+async function loadClientTags() {
+  try { clientTags = await api('/api/client-tags'); }
+  catch (e) { clientTags = ['在读', '离校', '意向']; }
+}
+
+// 渲染被评估者目录筛选条（全部 + 各标签 + 已归档，含数量）
+function renderClientDir() {
+  const el = document.getElementById('clientDir');
+  const counts = {};
+  clients.forEach(c => {
+    const k = c.status || '未分类';
+    counts[k] = (counts[k] || 0) + 1;
+  });
+  const tabs = ['全部', ...clientTags, '未分类'].filter((v, i, a) => a.indexOf(v) === i);
+  // 始终显示「已归档」（数量异步加载，先显示占位）
+  let archivedHtml = `<span class="dir-pill ${clientFilter==='已归档'?'active':''}" onclick="setClientFilter('已归档')">已归档<span class="cnt" id="archivedCnt">…</span></span>`;
+  el.innerHTML = tabs.map(t => {
+    const cnt = t === '全部' ? clients.length
+      : t === '未分类' ? (counts['未分类'] || 0)
+      : (counts[t] || 0);
+    if (t !== '全部' && !cnt) return '';  // 无成员的标签不显示
+    const active = clientFilter === t ? 'active' : '';
+    return `<span class="dir-pill ${active}" onclick="setClientFilter('${esc(t)}')">${esc(t)}<span class="cnt">${cnt}</span></span>`;
+  }).join('') + '<span style="flex:1"></span>' + archivedHtml;
+  // 异步获取归档数量
+  api('/api/clients?archived=1').then(arr => {
+    const cntEl = document.getElementById('archivedCnt');
+    if (cntEl) cntEl.textContent = arr.length;
+  }).catch(()=>{});
+}
+
+function setClientFilter(t) {
+  clientFilter = t;
+  renderClientDir();
+  // 已归档走单独 API
+  if (t === '已归档') { loadArchivedClients(); return; }
+  // 仅重新渲染列表（保留 clients，避免重复请求）
+  const el = document.getElementById('clientList');
+  const list = clientFilter === '全部'
+    ? clients
+    : clients.filter(c => (c.status || '') === clientFilter);
+  if (!list.length) {
+    el.innerHTML = `<div class="empty">「${esc(clientFilter)}」目录下暂无被评估者</div>`;
+    return;
+  }
+  el.innerHTML = list.map(c => {
+    const st = c.status || '';
+    const badge = st ? `<span class="c-status" data-cid="${c.id}" data-status="${esc(st)}">${esc(st)}</span>` : `<span class="c-status none" data-cid="${c.id}" data-status="">未分类</span>`;
+    return `<div class="list-item ${curClient && curClient.id === c.id ? 'active' : ''}" onclick="selectClient(${c.id})" oncontextmenu="showCtxMenu(event, ${c.id})">
+      <div class="t">${esc(c.name)} ${badge}</div>
+      <div class="m">${c.gender || ''} ${c.birth_date || ''}</div>
+    </div>`;
+  }).join('');
+}
+
+async function loadArchivedClients() {
+  try {
+    const archived = await api('/api/clients?archived=1');
+    archivedClients = archived;  // 缓存，供右键菜单/查看查找
+    const el = document.getElementById('clientList');
+    if (!archived.length) {
+      el.innerHTML = '<div class="empty">暂无已归档的被评估者</div>';
+      return;
+    }
+    el.innerHTML = archived.map(c =>
+      `<div class="list-item archived ${curClient && curClient.id === c.id ? 'active' : ''}" onclick="selectClient(${c.id})" oncontextmenu="showCtxMenu(event, ${c.id})">
+        <div class="t">${esc(c.name)} <span class="c-status none">已归档</span></div>
+        <div class="m">${c.gender || ''} ${c.birth_date || ''}</div>
+      </div>`
+    ).join('');
+  } catch(e) { toast('加载失败：' + e.message); }
+}
+
+function monthsBetween(birth, ref) {
+  // birth, ref: 'YYYY-MM-DD' 或 Date；返回整月（向下取整）
+  if (!birth) return null;
+  const b = new Date(birth);
+  if (isNaN(b)) return null;
+  const r = ref ? new Date(ref) : new Date();
+  let months = (r.getFullYear() - b.getFullYear()) * 12 + (r.getMonth() - b.getMonth());
+  if (r.getDate() < b.getDate()) months -= 1;
+  return Math.max(0, months);
+}
+
+function ageText(m) {
+  if (m == null) return '未知年龄';
+  const y = Math.floor(m / 12), mo = m % 12;
+  if (y === 0) return `${mo}个月`;
+  if (mo === 0) return `${y}岁`;
+  return `${y}岁${mo}个月`;
+}
+
+// 主评估适配月龄：以 3 个月为一个跨度。
+// 1) 把实际月龄向上取整到下一个 3 月边界（如 2岁2月 -> 2岁3月）；
+// 2) 若该 3 月区间内年龄映射里没有任何项目，则继续往后每 +3 月延伸，直到最近的“有项目的适配阶段”。
+//    例：映射只有 2岁0月/2岁6月，2岁2月的孩子 -> 2岁3月区间内无项目 -> 延伸到 2岁6月。
+function computeAdaptCutoff(cm, ages) {
+  if (cm == null) return null;
+  let stage = Math.ceil(cm / 3) * 3;       // 下一个 3 月边界
+  if (!ages || !ages.length) return stage;
+  const maxAge = ages[ages.length - 1];
+  let s = stage;
+  while (s <= maxAge + 3) {
+    // 该 3 月阶段区间 (s-3, s] 内是否存在项目
+    const has = ages.some(a => a <= s && a > s - 3);
+    if (has) return s;
+    s += 3;
+  }
+  return s; // 超出最大年龄，全部视为主评估
+}
+
+async function selectClient(id) {
+  await flushSave();   // 切换被评估者前，先保存当前评估的未存改动，避免数据丢失
+  curClient = clients.find(c => c.id === id) || archivedClients.find(c => c.id === id);
+  if (!curClient) {
+    // 可能来自归档视图（归档客户不在 clients 中），单独向服务端取详情
+    try { curClient = await api(`/api/clients/${id}`); }
+    catch (e) { alert('无法打开该被评估者：' + e.message); return; }
+  }
+  // 重新渲染列表并高亮当前项（归档视图与正常视图分别刷新）
+  if (clientFilter === '已归档') loadArchivedClients();
+  else loadClients();
+  document.getElementById('newAssBtn').disabled = false;
+  document.getElementById('assSelect').disabled = false;
+  document.getElementById('progBtn').disabled = false;
+  // 计算月龄 + 主评估适配月龄（3 个月跨度）+ 显示年龄筛选栏
+  clientMonths = monthsBetween(curClient.birth_date);
+  adaptMonths = computeAdaptCutoff(clientMonths, ALL_AGES);
+  const bar = document.getElementById('ageBar');
+  bar.style.display = '';
+  const adaptTxt = adaptMonths == null ? '未填写出生日期' :
+    `主评估适配至 ${ageText(adaptMonths)}（按 3 个月跨度）`;
+  document.getElementById('ageInfo').textContent =
+    `${curClient.name} · 实际 ${ageText(clientMonths)} · ${adaptTxt}（按出生日期 ${curClient.birth_date || '未填写'} 估算）`;
+  loadAssessments();
+}
+
+async function loadAssessments() {
+  const list = await api(`/api/clients/${curClient.id}/assessments`);
+  const sel = document.getElementById('assSelect');
+  if (!list.length) {
+    sel.innerHTML = '<option>暂无评估</option>';
+    sel.disabled = true;
+    curAssessment = null;
+    renderScaleEmpty();
+    return;
+  }
+  sel.disabled = false;
+  sel.innerHTML = list.map(a => `<option value="${a.id}">${esc(a.title)}（${a.date}）得分 ${a.summary.score}/${a.summary.max_total}</option>`).join('');
+  sel.value = list[0].id;
+  loadAssessment();
+}
+
+async function loadAssessment() {
+  await flushSave();   // 切换评估前，先保存当前评估的未存改动，避免数据丢失
+  const aid = document.getElementById('assSelect').value;
+  if (!aid || aid === '暂无评估') { renderScaleEmpty(); return; }
+  const d = await api(`/api/assessments/${aid}`);
+  curAssessment = d.assessment;
+  scores = Object.assign({}, d.scores);
+  editHistory = [];   // 切换评估清空撤销历史
+  dirty = false;
+  lastSavedAt = null;
+  document.getElementById('assMeta').style.display = '';
+  document.getElementById('assMeta').textContent = `${curAssessment.title} · ${curAssessment.date}`;
+  document.getElementById('expDocx').disabled = false;
+  document.getElementById('expPdf').disabled = false;
+  document.getElementById('abilityBtn').disabled = false;
+  document.getElementById('suggBtn').disabled = false;
+  document.getElementById('prevBtn').disabled = false;
+  renderScale();
+  renderSummary(d.total, d.domains);
+  updateSaveStatus();
+}
+
+function renderScaleEmpty() {
+  document.getElementById('scaleArea').innerHTML = '<div class="empty">请选择 / 新建一次评估后开始打分。</div>';
+  document.getElementById('summaryArea').innerHTML = '<div class="empty">尚未评分</div>';
+  document.getElementById('assMeta').style.display = 'none';
+}
+
+function renderScale() {
+  if (!SCALE) return;
+  const area = document.getElementById('scaleArea');
+  let html = '';
+  for (let di = 0; di < SCALE.domains.length; di++) {
+    const dom = SCALE.domains[di];
+    // 当前领域已得分与满分、已评项数（仅主评估计入得分率，拓展评估排除）
+    let maxd = 0, gotd = 0, rated = 0, mainCnt = 0;
+    dom.items.forEach(it => {
+      const isMain = (it.age == null) || (adaptMonths == null) || (it.age <= adaptMonths);
+      if (!isMain) return;
+      mainCnt++;
+      maxd += it.max_score;
+      const s = scores[it.code];
+      if (s !== undefined) { gotd += s; rated++; }
+    });
+    const rate = maxd ? Math.round(gotd/maxd*100) : 0;
+    const pct = mainCnt ? Math.round(rated/mainCnt*100) : 0;
+    html += `<div class="domain-block" id="dom-${di}">
+      <div class="domain-title"><span>${esc(dom.domain)}</span>
+        <span class="bar">${gotd}/${maxd} 分 · <span class="pct">已评 ${rated}/${mainCnt}</span> · ${rate}%</span></div>
+      <div class="prog"><i style="width:${pct}%"></i></div>
+      <div class="rated-info">评分进度 ${pct}%　（已评 ${rated} / 共 ${mainCnt} 项 · 仅主评估）</div>`;
+    dom.items.forEach(it => {
+      const cur = scores[it.code];
+      const age = it.age;
+      // 主评估 / 拓展判定：项月龄 <= 客户月龄 => 主评估；超出 => 拓展（无年龄数据则归入主评估）
+      const isMain = (age == null) || (adaptMonths == null) || (age <= adaptMonths);
+      const isExt = !isMain;
+      // 按筛选隐藏
+      if (ageFilter === 'main' && isExt) return;
+      if (ageFilter === 'ext' && isMain) return;
+      const tag = isExt ? '<span class="tag ext">拓展</span>' : '<span class="tag main">主评估</span>';
+      const sp = esc((it.skill_point||'').replace(/\s+/g,'')) || esc(it.code);
+      const name = esc(it.task_name||'');
+      const ageTxt = age == null ? '' : `<span class="max">· 适用${ageText(age)}</span>`;
+      let critHtml = '';
+      const crs = Object.keys(it.criteria).sort((a,b)=>b-a);
+      if (crs.length) {
+        critHtml = '<div class="crit">' + crs.map(k =>
+          `<div><span class="lv">${k}分</span> ${esc(it.criteria[k])}</div>`).join('') + '</div>';
+      }
+      let btns = '';
+      for (let v=0; v<=it.max_score; v++) {
+        btns += `<button class="${cur===v?'sel':''}" onclick="setScore('${it.code}',${v})" title="${v}分">${v}</button>`;
+      }
+      html += `<div class="item ${isExt?'ext':''}">
+        <div class="sp-title">
+          <span><span class="code">${it.code}</span> ${sp} ${tag}</span>
+          <span class="max">满分 ${it.max_score} ${ageTxt}</span>
+        </div>
+        <div class="desc">${name}</div>
+        ${critHtml}
+        <div class="scores">${btns}</div>
+      </div>`;
+    });
+    html += '</div>';
+  }
+  // 底部汇总筛选结果
+  const mainCount = countByFilter('main'), extCount = countByFilter('ext');
+  html += `<div class="rated-info" style="padding:10px 14px">共 ${SCALE.meta.total_items} 项 · 其中主评估 ${mainCount} 项、拓展评估 ${extCount} 项（年龄数据为里程碑估算值，仅供参考）</div>`;
+  // 底部状态栏：自动保存（无需手动保存按钮），仅保留撤销 + 刷新
+  html += `<div class="ass-footer">
+      <span id="saveStatus" class="status-text"></span>
+      <button class="btn-xs" id="btnUndo" onclick="undoEdits()" disabled title="撤销上一步修改">↩ 撤销</button>
+      <button class="btn-xs" onclick="reloadCurrent()" title="从服务器重新载入最新评分">↻ 刷新</button>
+    </div>`;
+  area.innerHTML = html;
+  updateSaveStatus();
+}
+
+function countByFilter(kind) {
+  if (!SCALE) return 0;
+  let n = 0;
+  for (const dom of SCALE.domains) for (const it of dom.items) {
+    const age = it.age;
+    const isMain = (age == null) || (adaptMonths == null) || (age <= adaptMonths);
+    if (kind === 'main' && isMain) n++;
+    if (kind === 'ext' && !isMain) n++;
+  }
+  return n;
+}
+
+function setAgeFilter(f) {
+  ageFilter = f;
+  document.querySelectorAll('#ageBar .segbtn').forEach(b => b.classList.toggle('active', b.dataset.f === f));
+  if (curAssessment) renderScale();
+}
+
+function setScore(code, val) {
+  const prev = scores[code];        // 改动前的取值（可能 undefined = 未评）
+  if (prev === val) { delete scores[code]; } else { scores[code] = val; }
+  // 记录到历史栈（仅当确有变化），供“撤销”跨自动保存回退
+  if (prev !== scores[code]) {
+    editHistory.push({ code, prev });
+    if (editHistory.length > 100) editHistory.shift();   // 限制栈深
+  }
+  dirty = true;
+  renderScale();
+  // 实时更新汇总（本地计算）
+  updateSummaryLive();
+  scheduleAutoSave();   // 输入后自动保存，避免切换/刷新导致数据丢失
+}
+
+function updateSummaryLive() {
+  if (!SCALE || !curAssessment) return;
+  let total = 0, rated = 0, mainMax = 0, mainCntTotal = 0;
+  const domStats = SCALE.domains.map(dom => {
+    let maxd=0, gotd=0, r=0;
+    dom.items.forEach(it=>{
+      const isMain = (it.age == null) || (adaptMonths == null) || (it.age <= adaptMonths);
+      if (!isMain) return;
+      maxd += it.max_score; mainMax += it.max_score; mainCntTotal++;
+      const s = scores[it.code]; if (s !== undefined) { gotd += s; r++; }
+    });
+    total += gotd; rated += r;
+    return { domain: dom.domain, score: gotd, max_score: maxd, rated: r, item_count: dom.items.length,
+             rate: maxd?Math.round(gotd/maxd*100):0 };
+  });
+  renderSummary({ score: total, max_total: mainMax, rated, total_items: mainCntTotal,
+                  rate: mainMax?Math.round(total/mainMax*100):0 }, domStats);
+}
+
+function renderSummary(total, domains) {
+  const area = document.getElementById('summaryArea');
+  let rows = domains.map((d, i) => `<tr class="dom-row" onclick="scrollToDomain(${i})" title="点击跳转到该领域">
+      <td><span class="dom-link">${esc(d.domain)}</span></td>
+      <td class="r">${d.score}/${d.max_score}</td><td class="r">${d.rate}%</td></tr>`).join('');
+  area.innerHTML = `
+    <div class="sum-card">
+      <div class="big">${total.score}<small> / ${total.max_total} 分</small></div>
+      <div class="pill">总得分率 ${total.rate}%</div>
+      <div class="pill">已评 ${total.rated}/${total.total_items} 项</div>
+      <div class="ring"><canvas id="ringChart" height="180"></canvas></div>
+    </div>
+    <table class="dd"><tr><td><b>领域</b></td><td class="r"><b>得分</b></td><td class="r"><b>率</b></td></tr>${rows}</table>`;
+  const ctx = document.getElementById('ringChart').getContext('2d');
+  if (window._ring) window._ring.destroy();
+  window._ring = new Chart(ctx, {
+    type: 'doughnut',
+    data: { labels: ['已掌握', '未掌握'], datasets: [{ data: [total.score, Math.max(0,total.max_total-total.score)],
+            backgroundColor: ['#1faa59', '#eef2f7'], borderWidth: 0 }] },
+    options: { cutout: '72%', plugins: { legend: { display: false },
+      tooltip: { callbacks: { label: c => c.label + ': ' + c.parsed } } } }
+  });
+}
+
+// 点击右侧领域行 → 左侧滚动到对应领域并短暂高亮
+function scrollToDomain(di) {
+  const el = document.getElementById(`dom-${di}`);
+  if (!el) return;
+  el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  // 短暂高亮提示
+  el.classList.add('dom-highlight');
+  setTimeout(() => el.classList.remove('dom-highlight'), 1500);
+}
+
+// ---- 自动保存 + 撤销 / 刷新 ----
+function scheduleAutoSave() {
+  const st = document.getElementById('saveStatus');
+  if (st) { st.textContent = '… 输入中，即将自动保存'; st.className = 'status-text pending'; }
+  if (_autoTimer) clearTimeout(_autoTimer);
+  _autoTimer = setTimeout(() => { flushSave(); }, 800);   // 停止输入 0.8s 后落库
+}
+
+async function flushSave() {
+  if (!curAssessment) return;
+  if (_autoTimer) { clearTimeout(_autoTimer); _autoTimer = null; }
+  if (!dirty) return;   // 无改动则不发请求
+  try {
+    await api(`/api/assessments/${curAssessment.id}/scores`, {
+      method: 'POST', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ scores })
+    });
+    dirty = false;
+    lastSavedAt = new Date();
+    updateSaveStatus();
+    updateAssOptionScore();
+  } catch(e) {
+    toast('保存失败：' + e.message);
+  }
+}
+
+// 撤销：回退上一步改分（会话历史栈，即使已自动保存也能逐步退回）
+function undoEdits() {
+  if (!curAssessment || editHistory.length === 0) return;
+  const last = editHistory.pop();
+  if (last.prev === undefined) delete scores[last.code];
+  else scores[last.code] = last.prev;
+  dirty = true;          // 撤销结果也要落库
+  renderScale();
+  updateSummaryLive();
+  scheduleAutoSave();    // 撤销后自动保存新值
+  updateSaveStatus();
+  toast('已撤销上一步修改');
+}
+
+// 修改：从服务器重新载入该评估的最新评分（同步其他端/他人的修改）
+async function reloadCurrent() {
+  if (!curAssessment) return;
+  if (dirty && !confirm('当前有未保存的修改，从服务器重新载入将覆盖这些修改。确定继续？')) return;
+  const d = await api(`/api/assessments/${curAssessment.id}`);
+  scores = Object.assign({}, d.scores);
+  editHistory = [];
+  dirty = false; lastSavedAt = null;
+  renderScale();
+  renderSummary(d.total, d.domains);
+  updateAssOptionScore();
+  updateSaveStatus();
+  toast('已从服务器重新载入最新评分');
+}
+
+// 更新左侧下拉里当前评估的“得分 X/Y”文本
+function updateAssOptionScore() {
+  if (!curAssessment || !SCALE) return;
+  let got = 0;
+  for (const dom of SCALE.domains) dom.items.forEach(it => { const s = scores[it.code]; if (s !== undefined) got += s; });
+  const sel = document.getElementById('assSelect');
+  if (!sel) return;
+  for (const opt of sel.options) {
+    if (String(opt.value) === String(curAssessment.id)) {
+      opt.textContent = `${curAssessment.title}（${curAssessment.date}）得分 ${got}/${SCALE.meta.max_total}`;
+    }
+  }
+}
+
+// 更新底部状态文字与"撤销"可用状态
+function updateSaveStatus() {
+  const st = document.getElementById('saveStatus');
+  if (!st) return;
+  if (!curAssessment) { st.textContent = ''; return; }
+  if (dirty) { st.textContent = '● 有未保存修改（输入停止后自动保存）'; st.className = 'status-text dirty'; }
+  else if (lastSavedAt) { st.textContent = '✓ 已自动保存 ' + lastSavedAt.toLocaleTimeString('zh-CN'); st.className = 'status-text ok'; }
+  else { st.textContent = '✓ 已载入（与服务器一致）'; st.className = 'status-text ok'; }
+  const ub = document.getElementById('btnUndo');
+  if (ub) {
+    ub.disabled = editHistory.length === 0;
+    ub.title = editHistory.length ? `撤销上一步修改（可撤销 ${editHistory.length} 步）` : '暂无可撤销的修改';
+  }
+}
+
+// flash 已移除（原用于保存按钮文字闪烁，现由状态栏文字替代）
+
+// 弹窗
+function showModal(id){ document.getElementById(id).classList.add('show'); }
+function hideModal(id){ document.getElementById(id).classList.remove('show'); }
+let _editingId = null;   // 当前弹窗是否处于“编辑”模式（null=新建）
+
+// 填充目录下拉（同步当前标签）
+async function fillClientStatusOptions() {
+  if (!clientTags.length) await loadClientTags();
+  const sel = document.getElementById('c_status');
+  sel.innerHTML = '<option value="">— 未分类 —</option>' +
+    clientTags.map(t => `<option value="${esc(t)}">${esc(t)}</option>`).join('');
+}
+
+// 新建被评估者：清空表单 + 标题改为“新增”
+async function showClientModal(){
+  _editingId = null;
+  await fillClientStatusOptions();
+  document.getElementById('clientModalTitle').textContent = '新增被评估者';
+  document.getElementById('c_name').value='';
+  document.getElementById('c_gender').value='';
+  document.getElementById('c_birth').value='';
+  document.getElementById('c_status').value='';
+  document.getElementById('c_note').value='';
+  showModal('clientModal');
+}
+
+// 编辑被评估者：用现有数据填充表单 + 标题改为“编辑”
+async function openClientModal(client){
+  if (!client) return;
+  _editingId = client.id;
+  await fillClientStatusOptions();
+  document.getElementById('clientModalTitle').textContent = '编辑被评估者';
+  document.getElementById('c_name').value = client.name || '';
+  document.getElementById('c_gender').value = client.gender || '';
+  document.getElementById('c_birth').value = client.birth_date || '';
+  document.getElementById('c_status').value = client.status || '';
+  document.getElementById('c_note').value = client.note || '';
+  showModal('clientModal');
+}
+
+// 保存按钮统一入口：编辑模式走 PUT，新建模式走 POST
+async function submitClient(){
+  if (_editingId != null) await updateClient(_editingId);
+  else await createClient();
+}
+
+async function createClient(){
+  const name = document.getElementById('c_name').value.trim();
+  if (!name) { alert('请填写姓名'); return; }
+  try {
+    const status = document.getElementById('c_status').value;
+    await api('/api/clients', { method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ name, gender:document.getElementById('c_gender').value,
+        birth_date:document.getElementById('c_birth').value,
+        note:document.getElementById('c_note').value,
+        status: status || null }) });
+    // 清空表单，避免下次带入旧数据
+    document.getElementById('c_name').value='';
+    document.getElementById('c_gender').value='';
+    document.getElementById('c_birth').value='';
+    document.getElementById('c_status').value='';
+    document.getElementById('c_note').value='';
+    _editingId = null;
+    hideModal('clientModal');
+    await loadClients();
+    toast('已保存：'+name);
+  } catch(e) {
+    alert('保存失败：' + e.message + '\n请确认服务已启动且本页面通过 http://127.0.0.1:5000 打开');
+  }
+}
+
+async function updateClient(id){
+  const name = document.getElementById('c_name').value.trim();
+  if (!name) { alert('请填写姓名'); return; }
+  try {
+    const status = document.getElementById('c_status').value;
+    await api(`/api/clients/${id}`, { method:'PUT', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ name, gender:document.getElementById('c_gender').value,
+        birth_date:document.getElementById('c_birth').value,
+        note:document.getElementById('c_note').value,
+        status: status || null }) });
+    _editingId = null;
+    hideModal('clientModal');
+    await loadClients();
+    toast('已更新：'+name);
+  } catch(e) {
+    alert('更新失败：' + e.message);
+  }
+}
+function showAssessmentModal(){ if(!curClient) return; showModal('assModal');
+  document.getElementById('a_date').value = new Date().toISOString().slice(0,10); }
+
+// ---------- 目录标签管理 ----------
+async function showTagModal(){
+  if (!clientTags.length) await loadClientTags();
+  renderTagList();
+  showModal('tagModal');
+}
+function renderTagList(){
+  const el = document.getElementById('tagList');
+  el.innerHTML = clientTags.map(t => `
+    <div style="display:flex;gap:6px;align-items:center">
+      <input value="${esc(t)}" data-old="${esc(t)}" class="tag-edit" style="flex:1;padding:5px 8px;border:1px solid var(--line);border-radius:6px"
+             onchange="renameTag(this.dataset.old, this.value)">
+      <button class="btn sm ghost" onclick="deleteTag('${esc(t)}')" title="删除该标签">🗑</button>
+    </div>`).join('');
+}
+async function addTag(){
+  const inp = document.getElementById('newTag');
+  const label = inp.value.trim();
+  if (!label) return;
+  try {
+    clientTags = await api('/api/client-tags', { method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ label }) });
+    inp.value = '';
+    renderTagList();
+    renderClientDir();
+    toast('已新增标签：' + label);
+  } catch(e) { alert('新增失败：' + e.message); }
+}
+async function renameTag(oldLabel, newLabel){
+  newLabel = (newLabel || '').trim();
+  if (!newLabel || newLabel === oldLabel) return;
+  try {
+    clientTags = await api('/api/client-tags', { method:'PUT', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ old: oldLabel, new: newLabel }) });
+    if (clientFilter === oldLabel) clientFilter = newLabel;  // 保持当前筛选指向新名
+    renderTagList();
+    renderClientDir();
+    await loadClients();   // 级联刷新被评估者状态
+    toast(`已将「${oldLabel}」改名为「${newLabel}」`);
+  } catch(e) { alert('改名失败：' + e.message); renderTagList(); }
+}
+async function deleteTag(label){
+  if (!confirm(`确定删除目录标签「${label}」？\n所有被分类为该标签的被评估者将变为「未分类」。`)) return;
+  try {
+    clientTags = await api('/api/client-tags', { method:'DELETE',
+      headers:{'Content-Type':'application/json'}, body: JSON.stringify({ label }) });
+    if (clientFilter === label) clientFilter = '全部';  // 被删标签的筛选回退到全部
+    renderTagList();
+    renderClientDir();
+    await loadClients();
+    toast('已删除标签：' + label);
+  } catch(e) { alert('删除失败：' + e.message); }
+}
+async function createAssessment(){
+  const title = document.getElementById('a_title').value.trim() || '评估';
+  try {
+    await api(`/api/clients/${curClient.id}/assessments`, { method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ title, assessor:document.getElementById('a_assessor').value,
+        date:document.getElementById('a_date').value }) });
+    document.getElementById('a_title').value='';
+    document.getElementById('a_assessor').value='';
+    hideModal('assModal');
+    await loadAssessments();
+    toast('已创建评估：'+title);
+  } catch(e) {
+    alert('创建失败：' + e.message + '\n请确认服务已启动且本页面通过 http://127.0.0.1:5000 打开');
+  }
+}
+
+// 导出报告
+function exportReport(fmt){
+  if(!curAssessment) return;
+  const tok = getToken();
+  const url = `/api/assessments/${curAssessment.id}/report?fmt=${fmt}` + (tok ? `&token=${encodeURIComponent(tok)}` : '');
+  const a = document.createElement('a');
+  a.href = url; a.download = ''; document.body.appendChild(a); a.click(); a.remove();
+  flash(fmt==='pdf'?'已生成PDF':'已生成Word');
+}
+
+// 能力年龄评估
+async function showAbility(){
+  if(!curAssessment) return;
+  const p = await api(`/api/assessments/${curAssessment.id}/ability`);
+  showModal('abilityModal');
+  const thr = Math.round((p.achieve_threshold||0.8)*100);
+  const thrEl = document.getElementById('abThr'); if(thrEl) thrEl.textContent = thr + '%';
+  document.getElementById('abilitySummary').textContent =
+    `实际年龄：${p.chronological_label} · 综合能力年龄（取各维度最低）：${p.overall_label}`;
+  const body = document.getElementById('abilityBody');
+  body.innerHTML = p.domains.map(d=>{
+    let concl, color='#888';
+    if(d.status && d.status.indexOf('滞后')>=0) color='#e2554f';
+    else if(d.status && d.status.indexOf('超前')>=0) color='#1faa59';
+    else if(d.status==='符合年龄') color='#1f7a4d';
+    else if(d.status==='未达标') color='#e2554f';
+    concl = `<span style="color:${color}">${d.status}</span>`;
+    return `<tr style="border-bottom:1px solid var(--line)">
+      <td style="padding:6px 8px">${d.domain}</td>
+      <td style="padding:6px 8px;text-align:center">${d.ability_label}</td>
+      <td style="padding:6px 8px;text-align:center">${d.chronological_label}</td>
+      <td style="padding:6px 8px;text-align:center">${concl}</td>
+      <td style="padding:6px 8px;text-align:center">${d.achieved}/${d.scored_with_age}</td>
+      <td style="padding:6px 8px;color:var(--muted);font-size:12px">${d.note||''}</td>
+    </tr>`;
+  }).join('');
+}
+
+// 干预建议面板（与导出报告内容一致）
+async function showSuggestions(){
+  if(!curAssessment) return;
+  let data;
+  try {
+    data = await api(`/api/assessments/${curAssessment.id}/suggestions`);
+  } catch(e) {
+    alert('加载干预建议失败：' + e.message);
+    return;
+  }
+  showModal('suggModal');
+  const sugg = data.suggestions || [];
+  document.getElementById('suggSummary').textContent =
+    sugg.length ? `共 ${sugg.length} 个需优先干预领域（按 P1→P3 排序）`
+                : '当前领域均达到实际年龄水平，暂无需优先干预的薄弱领域';
+  document.getElementById('suggIntro').innerHTML =
+    '优先度由三项合并计算：① 能力年龄滞后实际年龄月数（落后越多越优先）；② 基础领域自动加权；'
+    + '③ 临界可突破项数量（投入产出比高）。<br>'
+    + '说明：仅列入主评估（适龄）窗口内的未达标项，拓展评估（超龄）技能不计入。';
+  const ob = document.getElementById('suggOverviewBody');
+  if (!sugg.length) {
+    ob.innerHTML = '<tr><td colspan="6" style="padding:10px;color:var(--muted)">暂无需优先干预的薄弱领域。</td></tr>';
+  } else {
+    ob.innerHTML = sugg.map(s=>{
+      const lag = s.lag_proxy ? '—' : (Math.round(s.lag));
+      const color = s.tier==='P1' ? '#e2554f' : (s.tier==='P2' ? '#e8a33d' : '#1faa59');
+      return `<tr style="border-bottom:1px solid var(--line)">
+        <td style="padding:6px 8px;font-weight:700;color:${color}">${s.tier}</td>
+        <td style="padding:6px 8px">${esc(s.domain)}</td>
+        <td style="padding:6px 8px;text-align:center">${s.ability_label}</td>
+        <td style="padding:6px 8px;text-align:center">${s.chron_label}</td>
+        <td style="padding:6px 8px;text-align:center">${lag}</td>
+        <td style="padding:6px 8px;text-align:center">${s.unmastered_count}（${s.critical}）</td>
+      </tr>`;
+    }).join('');
+  }
+  const dd = document.getElementById('suggDetail');
+  if (!sugg.length) { dd.innerHTML = ''; return; }
+  dd.innerHTML = sugg.map(s=>{
+    const itemsHtml = s.items && s.items.length ? (
+      `<table style="width:100%;border-collapse:collapse;font-size:12.5px;margin-top:6px">
+        <thead><tr style="background:var(--primary);color:#fff;text-align:left">
+          <th style="padding:5px 7px">编号</th><th style="padding:5px 7px">技能点</th>
+          <th style="padding:5px 7px">任务</th><th style="padding:5px 7px">适用月龄</th>
+          <th style="padding:5px 7px">当前/满分</th><th style="padding:5px 7px">状态 · 教学建议</th>
+        </tr></thead>
+        <tbody>${s.items.map(it=>`<tr style="border-bottom:1px solid var(--line)">
+          <td style="padding:5px 7px;color:var(--primary-d);font-weight:600">${it.code}</td>
+          <td style="padding:5px 7px">${esc(it.skill_point)}</td>
+          <td style="padding:5px 7px">${esc(it.task_name)}</td>
+          <td style="padding:5px 7px">${it.age==null?'':ageText(it.age)}</td>
+          <td style="padding:5px 7px">${it.score}/${it.max}</td>
+          <td style="padding:5px 7px">${esc(it.state)} · ${esc(it.strategy)}</td>
+        </tr>`).join('')}</tbody>
+      </table>`
+    ) : '<div style="color:var(--muted);font-size:12px;margin-top:4px">（该领域未达标项已在总评中体现，暂无逐项明细。）</div>';
+    return `<div style="margin-top:14px">
+      <div style="font-weight:700;background:var(--soft);padding:6px 10px;border-radius:6px">
+        ${s.tier} · ${esc(s.domain)}</div>
+      <div style="font-size:12.5px;color:#475569;margin:6px 0">干预理由：${esc(s.reason)}</div>
+      ${itemsHtml}
+    </div>`;
+  }).join('');
+  // 缩写说明
+  if (sugg.length) {
+    dd.innerHTML += `<div style="margin-top:14px;padding:10px 12px;background:#f8fafc;border-radius:8px;font-size:12px;color:#6b7280;border:1px solid #e2e8f0">
+      <b>缩写说明：</b>DTT = 离散单元教学（Discrete Trial Training），适用于从零建立全新技能；
+      NET = 自然情境教学（Natural Environment Teaching），适用于已部分掌握的技能进行临界突破。</div>`;
+  }
+}
+
+// 报告预览：在新标签页打开 HTML 版报告（与 Word/PDF 内容一致，可直接打印/另存为 PDF）
+function showReportPreview(){
+  if(!curAssessment) return;
+  const tok = getToken();
+  const url = `/api/assessments/${curAssessment.id}/report?fmt=html` + (tok ? `&token=${encodeURIComponent(tok)}` : '');
+  window.open(url, '_blank');
+  toast('已打开报告预览（新标签页）');
+}
+
+// 成长曲线
+let _domainLineChart=null, _totalLineChart=null;
+async function showProgress(){
+  if(!curClient) return;
+  const p = await api(`/api/clients/${curClient.id}/progress`);
+  showModal('progModal');
+  document.getElementById('progSummary').textContent =
+    `共 ${p.count} 次评估` + (p.count? ` · ${p.labels.length} 个时间点` : '（暂无数据，先多做几次评估）');
+  // 总分折线
+  const tc = document.getElementById('totalLine').getContext('2d');
+  if(_totalLineChart) _totalLineChart.destroy();
+  _totalLineChart = new Chart(tc, {
+    type:'line',
+    data:{ labels:p.labels, datasets:[{ label:'总分得分率%', data:p.total_series,
+      borderColor:'#2f6fed', backgroundColor:'rgba(47,111,237,.12)', fill:true, tension:.25, pointRadius:4 }]},
+    options:{ scales:{ y:{ min:0, max:100, title:{display:true,text:'得分率%'} } },
+      plugins:{ legend:{display:false} } }
+  });
+  // 领域选择
+  const pick = document.getElementById('domainPick');
+  if(p.count===0){ pick.innerHTML=''; return; }
+  const names = p.domain_names;
+  pick.innerHTML = '显示维度：' + names.map((n,i)=>
+    `<label style="margin-right:8px;font-size:12px"><input type="checkbox" data-i="${i}" ${i<6?'checked':''} onchange="drawDomainLines()"> ${n}</label>`).join('');
+  window._progData = p;
+  drawDomainLines();
+}
+function drawDomainLines(){
+  const p = window._progData; if(!p) return;
+  const checks = document.querySelectorAll('#domainPick input');
+  const ds=[];
+  const palette=['#2f6fed','#1faa59','#e8a33d','#e2554f','#7c5cff','#0ea5b7','#d63384','#6b7280','#16a34a','#f59e0b'];
+  checks.forEach((c,i)=>{
+    if(c.checked){
+      ds.push({ label:p.domain_names[i], data:p.domain_series[p.domain_names[i]],
+        borderColor:palette[i%palette.length], fill:false, tension:.25, pointRadius:3, spanGaps:true });
+    }
+  });
+  const lc = document.getElementById('domainLine').getContext('2d');
+  if(_domainLineChart) _domainLineChart.destroy();
+  _domainLineChart = new Chart(lc, {
+    type:'line',
+    data:{ labels:p.labels, datasets:ds },
+    options:{ scales:{ y:{ min:0, max:100, title:{display:true,text:'得分率%'} } },
+      plugins:{ legend:{ position:'bottom', labels:{ boxWidth:12, font:{size:10} } } } }
+  });
+}
+
+// ---- 快速修改被评估者标签（点击列表中的状态徽标触发） ----
+let _pickerEl = null;
+function showStatusPicker(clientId, current, anchorEl) {
+  hideStatusPicker();  // 关闭已有的
+  if (!clientTags.length) { loadClientTags(); }
+  const div = document.createElement('div');
+  div.className = 'status-picker';
+  // 构建选项：各标签 + 清除（未分类）
+  let html = '';
+  clientTags.forEach(t => {
+    const checked = t === current ? ' ✅' : '';
+    html += `<div class="opt" data-status="${esc(t)}" onclick="pickFromPicker(${clientId}, this)">${esc(t)}${checked}</div>`;
+  });
+  html += '<div class="divider"></div>';
+  html += `<div class="opt" data-status="" onclick="pickFromPicker(${clientId}, this)" style="color:var(--muted)">${current ? '清除标签（设为未分类）' : '✅ 未分类'}</div>`;
+  div.innerHTML = html;
+  document.body.appendChild(div);
+  _pickerEl = div;
+  // 定位到锚点元素附近
+  const rect = anchorEl.getBoundingClientRect();
+  div.style.left = rect.left + 'px';
+  div.style.top = (rect.bottom + 4) + 'px';
+  // 点击外部关闭
+  setTimeout(() => {
+    document.addEventListener('mousedown', onPickerOutside);
+  }, 0);
+}
+function hideStatusPicker() {
+  if (_pickerEl) { _pickerEl.remove(); _pickerEl = null; }
+  document.removeEventListener('mousedown', onPickerOutside);
+}
+function onPickerOutside(e) {
+  if (_pickerEl && !_pickerEl.contains(e.target)) hideStatusPicker();
+}
+// 打开标签选择器（从 data-status 读取值，避免字符串插值转义问题）
+function openStatusPicker(cid, el) {
+  showStatusPicker(cid, el.dataset.status || '', el);
+}
+// 从选择器中选中某标签（从 data-status 读取值）
+function pickFromPicker(cid, el) {
+  pickStatus(cid, el.dataset.status || null, el);
+}
+// 捕获阶段委托：点击徽标打开选择器，并在冒泡到 .list-item 的 selectClient 之前拦截
+document.addEventListener('click', (e) => {
+  const badge = e.target.closest && e.target.closest('.c-status');
+  if (badge) {
+    e.stopPropagation();
+    e.preventDefault();
+    openStatusPicker(parseInt(badge.dataset.cid, 10), badge);
+  }
+}, true);
+async function pickStatus(clientId, newStatus, itemEl) {
+  hideStatusPicker();
+  try {
+    await api(`/api/clients/${clientId}`, { method:'PUT', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ status: newStatus || null }) });
+    // 更新本地缓存（正常列表 + 归档列表都要同步）
+    const c = clients.find(x => x.id === clientId) || (typeof archivedClients !== 'undefined' && archivedClients.find(x => x.id === clientId));
+    if (c) c.status = newStatus || null;
+    renderClientDir();
+    // 根据当前视图刷新对应列表（归档视图 / 正常筛选视图）
+    if (clientFilter === '已归档') {
+      loadArchivedClients();
+    } else {
+      const el = document.getElementById('clientList');
+      const list = clientFilter === '全部'
+        ? clients
+        : clients.filter(c => (c.status || '') === clientFilter);
+      if (!list.length) {
+        el.innerHTML = `<div class="empty">「${esc(clientFilter)}」目录下暂无被评估者</div>`;
+        toast(newStatus ? `已设置为「${newStatus}」（已切换出当前目录）` : '已清除标签');
+        return;
+      }
+      el.innerHTML = list.map(c => {
+        const st = c.status || '';
+        const badge = st ? `<span class="c-status" data-cid="${c.id}" data-status="${esc(st)}">${esc(st)}</span>` : `<span class="c-status none" data-cid="${c.id}" data-status="">未分类</span>`;
+        return `<div class="list-item ${curClient && curClient.id === c.id ? 'active' : ''}" onclick="selectClient(${c.id})">
+          <div class="t">${esc(c.name)} ${badge}</div>
+          <div class="m">${c.gender || ''} ${c.birth_date || ''}</div>
+        </div>`;
+      }).join('');
+    }
+    toast(newStatus ? `已设置为「${newStatus}」` : '已清除标签（未分类）');
+  } catch(e) {
+    alert('修改失败：' + e.message);
+  }
+}
+
+// ---- 右键操作菜单 ----
+let _ctxEl = null;   // 当前右键菜单 DOM
+let _ctxClient = null; // 当前操作的客户
+
+function showCtxMenu(event, clientId) {
+  event.preventDefault();
+  event.stopPropagation();
+  hideCtxMenu();  // 关闭已有菜单
+  const c = clients.find(x => x.id === clientId) || archivedClients.find(x => x.id === clientId);
+  if (!c) return;
+  _ctxClient = c;
+  const isArchived = !!c.is_archived;
+  const menu = document.createElement('div');
+  menu.className = 'ctx-menu';
+  menu.innerHTML = (isArchived
+    ? `<div class="ctx-item" onclick="ctxRestore()">♻️ 恢复（取消归档）</div>`
+    : `<div class="ctx-item" onclick="ctxEdit()">✏️ 编辑信息</div>
+       <div class="ctx-divider"></div>
+       <div class="ctx-item danger" onclick="ctxArchive()">🗑️ 归档（删除）</div>`);
+  document.body.appendChild(menu);
+  // 菜单内部的 mousedown 不冒泡到 document，避免外部关闭监听器在 click 前误删菜单
+  menu.addEventListener('mousedown', e => e.stopPropagation());
+  // 定位到鼠标位置，不超出视口
+  const x = Math.min(event.clientX, window.innerWidth - 170);
+  const y = Math.min(event.clientY, window.innerHeight - 160);
+  menu.style.left = x + 'px';
+  menu.style.top = y + 'px';
+  _ctxEl = menu;
+  // 点击外部关闭
+  setTimeout(() => document.addEventListener('mousedown', onCtxOutside), 0);
+}
+
+function hideCtxMenu() {
+  if (_ctxEl) { _ctxEl.remove(); _ctxEl = null; }
+  document.removeEventListener('mousedown', onCtxOutside);
+  _ctxClient = null;
+}
+
+function onCtxOutside(e) {
+  if (_ctxEl && !_ctxEl.contains(e.target)) hideCtxMenu();
+}
+
+// 右键菜单操作
+function ctxEdit() {
+  const c = _ctxClient;
+  if (!c) return;
+  hideCtxMenu();
+  openClientModal(c);  // 复用已有的编辑弹窗
+}
+
+async function ctxArchive() {
+  const c = _ctxClient;
+  if (!c) return;
+  hideCtxMenu();
+  if (!confirm(`确定归档「${c.name}」？\n\n归档后该被评估者将从列表中隐藏（数据保留），可在「已归档」中恢复。`)) return;
+  try {
+    await api(`/api/clients/${c.id}`, { method: 'DELETE' });
+    clients = clients.filter(x => x.id !== c.id);
+    if (curClient && curClient.id === c.id) { curClient = null; renderScaleEmpty(); }
+    renderClientDir();
+    loadClients();  // 刷新列表
+    toast(`已归档「${c.name}」`);
+  } catch(e) {
+    alert('归档失败：' + e.message);
+  }
+}
+
+async function ctxRestore() {
+  const c = _ctxClient;
+  if (!c) return;
+  hideCtxMenu();
+  try {
+    const restored = await api(`/api/clients/${c.id}/restore`, { method: 'POST' });
+    // 从归档列表移除，加回正常列表
+    clients.push(restored);
+    renderClientDir();
+    if (clientFilter === '已归档') loadArchivedClients();
+    else loadClients();
+    toast(`已恢复「${c.name}」`);
+  } catch(e) {
+    alert('恢复失败：' + e.message);
+  }
+}
+
+function esc(s){ return (s||'').replace(/[&<>'"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c])); }
+
+// 顶部轻提示
+function toast(msg){
+  let t = document.getElementById('toast');
+  if (!t) { t = document.createElement('div'); t.id='toast';
+    t.style.cssText='position:fixed;top:14px;left:50%;transform:translateX(-50%);background:#1faa59;color:#fff;padding:8px 16px;border-radius:8px;z-index:99;font-size:13px;box-shadow:0 4px 14px rgba(0,0,0,.18)';
+    document.body.appendChild(t); }
+  t.textContent = msg; t.style.display='block';
+  clearTimeout(t._timer); t._timer = setTimeout(()=> t.style.display='none', 1800);
+}
+
+// ---------- 账号 / 鉴权 ----------
+const TOKEN_KEY = 'eval_token';
+function getToken(){ return localStorage.getItem(TOKEN_KEY); }
+function setToken(t){ localStorage.setItem(TOKEN_KEY, t); }
+function clearToken(){ localStorage.removeItem(TOKEN_KEY); }
+
+let _authMode = 'login';
+function switchAuth(m){
+  _authMode = m;
+  document.getElementById('tabLogin').classList.toggle('active', m==='login');
+  document.getElementById('tabReg').classList.toggle('active', m==='reg');
+  document.getElementById('authTitle').textContent = m==='login' ? '登录' : '注册新账号';
+  document.getElementById('authDesc').textContent = m==='login' ? '登录后使用评估系统' : '创建账号后，你的评估数据将独立保存';
+  document.getElementById('authSubmit').textContent = m==='login' ? '登录' : '注册';
+  document.getElementById('authErr').textContent = '';
+}
+async function submitAuth(){
+  const user = document.getElementById('authUser').value.trim();
+  const pwd = document.getElementById('authPwd').value;
+  const errEl = document.getElementById('authErr');
+  errEl.textContent = '';
+  if (!user || !pwd) { errEl.textContent = '请输入用户名和密码'; return; }
+  try {
+    let res;
+    if (_authMode === 'login') {
+      res = await fetch('/api/login', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ username:user, password:pwd }) });
+    } else {
+      res = await fetch('/api/register', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ username:user, password:pwd }) });
+    }
+    if (!res.ok) { const e = await res.json().catch(()=>({})); errEl.textContent = e.error || '操作失败'; return; }
+    const data = await res.json();
+    setToken(data.token);
+    window.__USER__ = data.user;
+    hideAuth();
+    await bootApp();
+  } catch(e) { errEl.textContent = e.message; }
+}
+function showAuth(){
+  stopHeartbeat();
+  document.getElementById('authMask').style.display = 'flex';
+  fetch('/api/public-config').then(r => r.ok ? r.json() : null).then(cfg => {
+    const regTab = document.getElementById('tabReg');
+    if (cfg && cfg.allow_self_register !== '1') {
+      regTab.style.display = 'none';
+      if (_authMode === 'reg') switchAuth('login');
+    } else {
+      regTab.style.display = '';
+    }
+  }).catch(()=>{});
+}
+function hideAuth(){ document.getElementById('authMask').style.display = 'none'; }
+// 心跳：登录后定期校验 token / 账号状态，被禁用或失效时立即弹回登录页
+let _hbTimer = null;
+function startHeartbeat(){
+  stopHeartbeat();
+  _hbTimer = setInterval(async () => {
+    const tok = getToken();
+    if (!tok) { stopHeartbeat(); return; }
+    try {
+      const r = await fetch('/api/me', { headers: { 'Authorization': 'Bearer ' + tok } });
+      if (!r.ok) { clearToken(); stopHeartbeat(); showAuth(); }
+    } catch(e) { /* 网络异常忽略，下次再试 */ }
+  }, 30000);
+}
+function stopHeartbeat(){ if (_hbTimer) { clearInterval(_hbTimer); _hbTimer = null; } }
+function doLogout(){
+  const tok = getToken();
+  if (tok) fetch('/api/logout', { method:'POST', headers:{'Authorization':'Bearer '+tok} }).catch(()=>{});
+  clearToken();
+  window.__USER__ = null;
+  document.getElementById('userbox').style.display = 'none';
+  document.getElementById('clientList').innerHTML = '<div class="empty">请登录</div>';
+  showAuth();
+}
+function afterLoginUI(){
+  const u = window.__USER__;
+  if (!u) return;
+  document.getElementById('userbox').style.display = 'flex';
+  document.getElementById('uname').textContent = u.username + (u.role === 'admin' ? '（管理员）' : '');
+  document.getElementById('adminLink').style.display = u.role === 'admin' ? '' : 'none';
+  document.getElementById('tagBtn').style.display = u.role === 'admin' ? '' : 'none';
+}
+async function bootApp(){
+  await loadScale();
+  await loadClients();
+  afterLoginUI();
+  startHeartbeat();
+}
+
+// 初始化
+(async ()=>{
+  const tok = getToken();
+  if (!tok) { showAuth(); return; }
+  try {
+    window.__USER__ = await api('/api/me');
+    await bootApp();
+  } catch(e) {
+    clearToken();
+    showAuth();
+  }
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,366 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>管理后台 - 语言与学习技能评估系统</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  :root { --bg:#f5f7fa; --panel:#fff; --line:#e3e8ef; --text:#1f2933; --muted:#66727f;
+          --primary:#2f6fed; --primary-d:#1f54c4; --ok:#1faa59; --warn:#e8a33d; --danger:#e2554f; --soft:#eef3ff; }
+  body { font-family:-apple-system,"PingFang SC","Microsoft YaHei",sans-serif; background:var(--bg); color:var(--text); font-size:14px; }
+  header { background:linear-gradient(90deg,#2f6fed,#5b8def); color:#fff; padding:14px 22px; display:flex; align-items:center; justify-content:space-between; }
+  header h1 { font-size:17px; font-weight:600; }
+  header a, header button { color:#fff; text-decoration:none; }
+  .wrap { max-width:1100px; margin:18px auto; padding:0 16px; }
+  .tabs { display:flex; gap:8px; margin-bottom:16px; }
+  .tabs button { padding:8px 16px; border:1px solid var(--line); background:#fff; border-radius:8px; cursor:pointer; font-size:13px; color:var(--muted); }
+  .tabs button.active { background:var(--primary); color:#fff; border-color:var(--primary); }
+  .panel { background:var(--panel); border:1px solid var(--line); border-radius:10px; padding:18px; margin-bottom:16px; }
+  .panel h2 { font-size:15px; margin-bottom:14px; }
+  .stats { display:grid; grid-template-columns:repeat(auto-fill,minmax(150px,1fr)); gap:12px; }
+  .stat { background:var(--soft); border-radius:10px; padding:14px; }
+  .stat .n { font-size:24px; font-weight:700; color:var(--primary-d); }
+  .stat .l { font-size:12px; color:var(--muted); margin-top:4px; }
+  table { width:100%; border-collapse:collapse; font-size:13px; }
+  th, td { text-align:left; padding:9px 10px; border-bottom:1px solid var(--line); }
+  th { background:#fafbfc; color:var(--muted); font-weight:600; }
+  .btn { background:var(--primary); color:#fff; border:none; border-radius:7px; padding:7px 12px; cursor:pointer; font-size:13px; }
+  .btn:hover { background:var(--primary-d); }
+  .btn.ghost { background:#fff; color:var(--primary); border:1px solid var(--primary); }
+  .btn.sm { padding:4px 9px; font-size:12px; }
+  .btn.danger { background:var(--danger); }
+  .btn.danger:hover { background:#c0392b; }
+  .pill { display:inline-block; font-size:11px; padding:1px 8px; border-radius:10px; }
+  .pill.admin { background:var(--soft); color:var(--primary-d); }
+  .pill.active { background:#e6f6ec; color:var(--ok); }
+  .pill.disabled { background:#fdeaea; color:var(--danger); }
+  .row { display:flex; gap:10px; justify-content:flex-end; margin-top:14px; }
+  label { display:block; font-size:12px; color:var(--muted); margin:10px 0 4px; }
+  input, select, textarea { width:100%; padding:8px; border:1px solid var(--line); border-radius:7px; font-size:13px; }
+  .modal { position:fixed; inset:0; background:rgba(15,23,42,.45); display:none; align-items:center; justify-content:center; z-index:50; }
+  .modal.show { display:flex; }
+  .modal .box { background:#fff; border-radius:12px; padding:20px; width:420px; max-width:92vw; }
+  .modal .box h3 { margin-bottom:12px; }
+  .hint { font-size:12px; color:var(--muted); }
+  .err { color:var(--danger); font-size:12px; min-height:16px; margin-top:6px; }
+  .toolbar { display:flex; justify-content:space-between; align-items:center; margin-bottom:12px; }
+  .authmask { position:fixed; inset:0; background:rgba(15,23,42,.55); display:flex; align-items:center; justify-content:center; z-index:100; }
+  .authbox { background:#fff; border-radius:14px; padding:26px; width:360px; max-width:92vw; box-shadow:0 10px 40px rgba(0,0,0,.22); }
+  .authbox h2 { font-size:18px; margin-bottom:6px; }
+  .authbox .hint a { color:var(--primary); }
+</style>
+</head>
+<body>
+<header>
+  <h1>🛠 管理后台</h1>
+  <div>
+    <a class="btn ghost" href="/" style="padding:6px 12px;font-size:12px;">← 返回系统</a>
+    <button class="btn ghost" onclick="doLogout()" style="padding:6px 12px;font-size:12px;margin-left:8px;">退出</button>
+  </div>
+</header>
+
+<div class="wrap">
+  <div class="tabs">
+    <button class="active" data-tab="overview" onclick="switchTab('overview')">概览</button>
+    <button data-tab="users" onclick="switchTab('users')">用户管理</button>
+    <button data-tab="logs" onclick="switchTab('logs')">操作日志</button>
+    <button data-tab="config" onclick="switchTab('config')">系统配置</button>
+  </div>
+
+  <!-- 概览 -->
+  <div id="tab-overview" class="tabpane">
+    <div class="panel">
+      <h2>数据统计</h2>
+      <div class="stats" id="statsCards"><div class="hint">加载中…</div></div>
+    </div>
+  </div>
+
+  <!-- 用户管理 -->
+  <div id="tab-users" class="tabpane" style="display:none">
+    <div class="panel">
+      <div class="toolbar">
+        <h2 style="margin:0">注册用户</h2>
+        <button class="btn" onclick="showCreateUser()">+ 新建用户</button>
+      </div>
+      <table id="userTable">
+        <thead><tr><th>ID</th><th>用户名</th><th>角色</th><th>状态</th><th>被评估者</th><th>注册时间</th><th>操作</th></tr></thead>
+        <tbody id="userBody"><tr><td colspan="7" class="hint">加载中…</td></tr></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- 操作日志 -->
+  <div id="tab-logs" class="tabpane" style="display:none">
+    <div class="panel">
+      <div class="toolbar">
+        <h2 style="margin:0">操作日志</h2>
+        <button class="btn ghost sm" onclick="loadLogs(true)">刷新</button>
+      </div>
+      <table>
+        <thead><tr><th>时间</th><th>用户</th><th>操作</th><th>对象</th><th>详情</th><th>IP</th></tr></thead>
+        <tbody id="logBody"><tr><td colspan="6" class="hint">加载中…</td></tr></tbody>
+      </table>
+      <div style="text-align:center;margin-top:12px"><button class="btn ghost sm" onclick="loadLogs(false)">加载更多</button></div>
+    </div>
+  </div>
+
+  <!-- 系统配置 -->
+  <div id="tab-config" class="tabpane" style="display:none">
+    <div class="panel">
+      <h2>基础系统配置</h2>
+      <label>系统名称（显示在标题等位置）</label>
+      <input id="cfgSiteName" placeholder="语言与学习技能评估系统">
+      <label>开放自助注册</label>
+      <select id="cfgReg"><option value="1">开放（任何人可注册）</option><option value="0">关闭（仅管理员可创建账号）</option></select>
+      <label>目录标签（每行一个，如 在读 / 离校 / 意向）</label>
+      <textarea id="cfgTags" rows="4" placeholder="在读&#10;离校&#10;意向"></textarea>
+      <div class="err" id="cfgErr"></div>
+      <div class="row">
+        <button class="btn" onclick="saveConfig()">保存配置</button>
+      </div>
+      <p class="hint" style="margin-top:10px">提示：关闭自助注册后，登录页将隐藏「注册」入口，新用户需由你在此页创建。</p>
+    </div>
+  </div>
+</div>
+
+<!-- 新建/编辑用户弹窗 -->
+<div class="modal" id="userModal">
+  <div class="box">
+    <h3 id="userModalTitle">新建用户</h3>
+    <input type="hidden" id="u_id">
+    <label>用户名（至少 3 位）</label>
+    <input id="u_username" placeholder="如 teacher01">
+    <label>密码（至少 6 位；编辑时留空表示不改）</label>
+    <input id="u_password" type="password" placeholder="留空则不修改">
+    <label>角色</label>
+    <select id="u_role"><option value="user">普通用户</option><option value="admin">管理员</option></select>
+    <label>状态</label>
+    <select id="u_status"><option value="active">启用</option><option value="disabled">禁用</option></select>
+    <div class="err" id="userErr"></div>
+    <div class="row">
+      <button class="btn ghost" onclick="hideModal('userModal')">取消</button>
+      <button class="btn" onclick="submitUser()">保存</button>
+    </div>
+  </div>
+</div>
+
+<div id="adminAuthMask" class="authmask">
+  <div class="authbox">
+    <h2>管理员登录</h2>
+    <div class="hint" id="admin_msg">请输入管理员账号以进入后台</div>
+    <label>用户名</label>
+    <input id="admin_user" placeholder="管理员用户名" autocomplete="username" />
+    <label>密码</label>
+    <input id="admin_pwd" type="password" placeholder="密码" autocomplete="current-password" onkeydown="if(event.key==='Enter')adminLogin()" />
+    <div class="err" id="admin_err"></div>
+    <div class="row"><button class="btn" onclick="adminLogin()">登录</button></div>
+    <div class="hint" style="margin-top:12px;text-align:center"><a href="/">返回系统首页（普通用户）</a></div>
+  </div>
+</div>
+
+<script>
+const TOKEN_KEY = 'eval_token';
+function getToken(){ return localStorage.getItem(TOKEN_KEY); }
+function setToken(t){ localStorage.setItem(TOKEN_KEY, t); }
+function clearToken(){ localStorage.removeItem(TOKEN_KEY); }
+async function api(url, opts={}){
+  opts.headers = opts.headers || {};
+  const t = getToken(); if (t) opts.headers['Authorization'] = 'Bearer ' + t;
+  const r = await fetch(url, opts);
+  if (r.status === 401 || r.status === 403) { showAdminAuth('登录已失效，请重新登录'); throw new Error('无权限'); }
+  if (!r.ok) { const e = await r.json().catch(()=>({})); throw new Error(e.error || '请求失败'); }
+  return r.json();
+}
+function showModal(id){ document.getElementById(id).classList.add('show'); }
+function hideModal(id){ document.getElementById(id).classList.remove('show'); }
+function showAdminAuth(msg){
+  if (msg) document.getElementById('admin_msg').textContent = msg;
+  document.getElementById('admin_err').textContent = '';
+  document.getElementById('adminAuthMask').style.display = 'flex';
+}
+function hideAdminAuth(){ document.getElementById('adminAuthMask').style.display = 'none'; }
+
+function doLogout(){
+  const t = getToken();
+  if (t) fetch('/api/logout', {method:'POST', headers:{'Authorization':'Bearer '+t}}).catch(()=>{});
+  clearToken(); location.href = '/';
+}
+
+async function adminLogin(){
+  const username = document.getElementById('admin_user').value.trim();
+  const password = document.getElementById('admin_pwd').value;
+  const errEl = document.getElementById('admin_err');
+  errEl.textContent = '';
+  try {
+    const r = await fetch('/api/login', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({username, password})});
+    if (!r.ok) { const e = await r.json().catch(()=>({})); errEl.textContent = e.error || '登录失败'; return; }
+    const d = await r.json();
+    setToken(d.token);
+    if (d.user.role !== 'admin') { errEl.textContent = '该账号不是管理员，无后台访问权限'; clearToken(); return; }
+    document.getElementById('admin_user').value = '';
+    document.getElementById('admin_pwd').value = '';
+    await initAdmin();
+  } catch(e){ errEl.textContent = '网络错误：' + e.message; }
+}
+
+async function initAdmin(){
+  hideAdminAuth();
+  await loadStats();
+  await loadUsers();
+}
+
+(async ()=>{
+  const t = getToken();
+  if (t) {
+    try {
+      const r = await fetch('/api/me', {headers:{'Authorization':'Bearer '+t}});
+      if (r.ok) {
+        const me = await r.json();
+        if (me.role === 'admin') { await initAdmin(); return; }
+        showAdminAuth('当前账号（' + me.username + '）不是管理员，请用管理员账号登录');
+        return;
+      }
+    } catch(e){}
+  }
+  showAdminAuth();
+})();
+
+function switchTab(name){
+  document.querySelectorAll('.tabs button').forEach(b => b.classList.toggle('active', b.dataset.tab === name));
+  document.querySelectorAll('.tabpane').forEach(p => p.style.display = (p.id === 'tab-' + name) ? '' : 'none');
+  if (name === 'overview') loadStats();
+  if (name === 'users') loadUsers();
+  if (name === 'logs') loadLogs(true);
+  if (name === 'config') loadConfig();
+}
+
+async function loadStats(){
+  const s = await api('/api/admin/stats');
+  const cards = [
+    ['用户总数', s.users], ['启用用户', s.users_active], ['近7天注册', s.recent_registrations],
+    ['被评估者', s.clients], ['评估记录', s.assessments], ['评分项', s.scores], ['操作日志', s.logs],
+  ];
+  document.getElementById('statsCards').innerHTML = cards.map(c =>
+    `<div class="stat"><div class="n">${c[1]}</div><div class="l">${c[0]}</div></div>`).join('');
+}
+
+async function loadUsers(){
+  const users = await api('/api/admin/users');
+  document.getElementById('userBody').innerHTML = users.map(u => `
+    <tr>
+      <td>${u.id}</td>
+      <td>${esc(u.username)}</td>
+      <td><span class="pill ${u.role==='admin'?'admin':''}">${u.role==='admin'?'管理员':'普通用户'}</span></td>
+      <td><span class="pill ${u.status==='active'?'active':'disabled'}">${u.status==='active'?'启用':'禁用'}</span></td>
+      <td>${u.client_count}</td>
+      <td>${u.created_at||''}</td>
+      <td>
+        <button class="btn ghost sm" onclick="showEditUser(${u.id})">编辑</button>
+        <button class="btn danger sm" onclick="delUser(${u.id},'${esc(u.username)}')">删除</button>
+      </td>
+    </tr>`).join('') || '<tr><td colspan="7" class="hint">暂无用户</td></tr>';
+}
+
+function showCreateUser(){
+  document.getElementById('userModalTitle').textContent = '新建用户';
+  document.getElementById('u_id').value = '';
+  document.getElementById('u_username').value = '';
+  document.getElementById('u_password').value = '';
+  document.getElementById('u_role').value = 'user';
+  document.getElementById('u_status').value = 'active';
+  document.getElementById('userErr').textContent = '';
+  document.getElementById('u_username').disabled = false;
+  showModal('userModal');
+}
+function showEditUser(id){
+  api(`/api/admin/users/${id}`).catch(()=>null);
+  // 直接用列表已知信息不够，走一次管理员列表取该行
+  api('/api/admin/users').then(users => {
+    const u = users.find(x => x.id === id);
+    if (!u) return;
+    document.getElementById('userModalTitle').textContent = '编辑用户：' + u.username;
+    document.getElementById('u_id').value = u.id;
+    document.getElementById('u_username').value = u.username;
+    document.getElementById('u_username').disabled = true;
+    document.getElementById('u_password').value = '';
+    document.getElementById('u_role').value = u.role;
+    document.getElementById('u_status').value = u.status;
+    document.getElementById('userErr').textContent = '';
+    showModal('userModal');
+  });
+}
+async function submitUser(){
+  const id = document.getElementById('u_id').value;
+  const username = document.getElementById('u_username').value.trim();
+  const password = document.getElementById('u_password').value;
+  const role = document.getElementById('u_role').value;
+  const status = document.getElementById('u_status').value;
+  const err = document.getElementById('userErr');
+  err.textContent = '';
+  if (!id && !username) { err.textContent = '请填写用户名'; return; }
+  if (!id && password && password.length < 6) { err.textContent = '密码至少 6 位'; return; }
+  try {
+    if (!id) {
+      await api('/api/admin/users', { method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({ username, password, role }) });
+    } else {
+      const body = { role, status };
+      if (password) body.password = password;
+      await api(`/api/admin/users/${id}`, { method:'PUT', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body) });
+    }
+    hideModal('userModal');
+    await loadUsers();
+    await loadStats();
+  } catch(e) { err.textContent = e.message; }
+}
+async function delUser(id, name){
+  if (!confirm(`确定删除用户「${name}」？\n该用户的所有被评估者、评估与评分将一并删除，不可恢复。`)) return;
+  try {
+    await api(`/api/admin/users/${id}`, { method:'DELETE' });
+    await loadUsers(); await loadStats();
+  } catch(e) { alert(e.message); }
+}
+
+let _logOffset = 0;
+async function loadLogs(reset){
+  if (reset) _logOffset = 0;
+  const limit = 50;
+  const d = await api(`/api/admin/logs?limit=${limit}&offset=${_logOffset}`);
+  const rows = d.logs.map(l => `<tr>
+    <td>${l.created_at||''}</td>
+    <td>${esc(l.username||'系统')}</td>
+    <td>${esc(l.action)}</td>
+    <td>${esc((l.target_type||'') + (l.target_id?('#'+l.target_id):''))}</td>
+    <td>${esc(l.detail||'')}</td>
+    <td>${esc(l.ip||'')}</td>
+  </tr>`).join('');
+  const body = document.getElementById('logBody');
+  body.innerHTML = (reset ? '' : body.innerHTML) + (rows || (reset ? '<tr><td colspan="6" class="hint">暂无日志</td></tr>' : ''));
+  _logOffset += d.logs.length;
+}
+
+async function loadConfig(){
+  const c = await api('/api/admin/config');
+  document.getElementById('cfgSiteName').value = c.site_name || '';
+  document.getElementById('cfgReg').value = c.allow_self_register || '1';
+  document.getElementById('cfgTags').value = (c.client_tags || []).join('\n');
+}
+async function saveConfig(){
+  const tags = document.getElementById('cfgTags').value.split('\n').map(s=>s.trim()).filter(Boolean);
+  const err = document.getElementById('cfgErr'); err.textContent='';
+  try {
+    await api('/api/admin/config', { method:'PUT', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({
+        site_name: document.getElementById('cfgSiteName').value.trim(),
+        allow_self_register: document.getElementById('cfgReg').value,
+        client_tags: tags,
+      }) });
+    alert('配置已保存');
+  } catch(e) { err.textContent = e.message; }
+}
+
+function esc(s){ return (s==null?'':String(s)).replace(/[&<>'"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c])); }
+</script>
+</body>
+</html>
