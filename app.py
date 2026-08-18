@@ -19,8 +19,13 @@ from itsdangerous import URLSafeTimedSerializer, BadSignature, SignatureExpired
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DATA_FILE = os.path.join(BASE_DIR, "ablls_data.json")
 AGE_FILE = os.path.join(BASE_DIR, "age_map.json")
-DB_FILE = os.path.join(BASE_DIR, "ablls.db")
 STATIC_DIR = os.path.join(BASE_DIR, "static")
+
+# Vercel Serverless 的文件系统只读，未配置 DATABASE_URL 时把 SQLite 放到 /tmp
+if os.environ.get("VERCEL") and not os.environ.get("DATABASE_URL"):
+    DB_FILE = "/tmp/ablls.db"
+else:
+    DB_FILE = os.path.join(BASE_DIR, "ablls.db")
 
 app = Flask(__name__, static_folder=STATIC_DIR)
 
