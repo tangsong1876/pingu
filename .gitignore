@@ -4,6 +4,7 @@ __pycache__/
 *.db
 *.db.bak*
 启动.bat
+autostart.vbs
 .vercel
 .workbuddy/
 *.log

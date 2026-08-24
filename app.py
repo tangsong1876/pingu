@@ -296,7 +296,7 @@ class _PGConn:
         sql = self._pg_sql(sql)
         cur = self._conn.cursor()
         s = sql.strip().upper()
-        do_return = s.startswith("INSERT") and " RETURNING " not in s
+        do_return = s.startswith("INSERT") and " RETURNING " not in s and "ON CONFLICT" not in s
         if do_return:
             sql = sql.rstrip().rstrip(";") + " RETURNING id"
         cur.execute(sql, params or ())
@@ -415,7 +415,8 @@ _PG_DDL = [
         FOREIGN KEY(user_id) REFERENCES users(id)
     )""",
     """CREATE TABLE IF NOT EXISTS settings (
-        key TEXT PRIMARY KEY,
+        id SERIAL PRIMARY KEY,
+        key TEXT UNIQUE NOT NULL,
         value TEXT
     )""",
 ]

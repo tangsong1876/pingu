@@ -1,0 +1,33 @@
+# 开发脚本，部署不需要
+build_age_map.py
+cross_validate.py
+extract.py
+
+# Git
+.git/
+.gitignore
+
+# Vercel 自身
+.vercel/
+
+# 文档/参考资料
+r3_ability.docx
+r3_ability.pdf
+ablls_structure.json
+ablls_text.txt
+
+# 本地运行时文件
+runtime/
+__pycache__/
+*.pyc
+*.db
+*.db.bak*
+*.log
+.write_test
+启动.bat
+autostart.vbs
+server.log
+server_d.log
+
+# WorkBuddy
+.workbuddy/
