@@ -15,11 +15,12 @@ _PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if _PROJECT_ROOT not in sys.path:
     sys.path.insert(0, _PROJECT_ROOT)
 
-from app import app as _flask_app  # noqa: E402
-
 
 def app(environ, start_response):
     """WSGI 包装器：还原 Vercel rewrite 丢失的原始 PATH_INFO。"""
+    # 延迟导入真正的 Flask app，避免顶层暴露其它 WSGI callable 被 Vercel 误选
+    from app import app as flask_app  # noqa: E402
+
     path = environ.get("PATH_INFO", "")
     if path == "/api/index":
         raw_qs = environ.get("QUERY_STRING", "")
@@ -31,4 +32,4 @@ def app(environ, start_response):
         environ["QUERY_STRING"] = "&".join(
             f"{k}={v[0]}" for k, v in rest.items()
         )
-    return _flask_app(environ, start_response)
+    return flask_app(environ, start_response)
