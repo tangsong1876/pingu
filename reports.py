@@ -13,14 +13,34 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 from matplotlib import font_manager
 
-# 注册中文字体（Windows 微软雅黑）
-FONT_PATH = r"C:\Windows\Fonts\msyh.ttc"
-if os.path.exists(FONT_PATH):
-    try:
-        font_manager.fontManager.addfont(FONT_PATH)
-        plt.rcParams["font.family"] = font_manager.FontProperties(fname=FONT_PATH).get_name()
-    except Exception:
-        pass
+# 中文字体配置：优先项目内子集字体，再尝试 Windows / Linux 系统字体
+_BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+CN_FONT_CANDIDATES = [
+    os.path.join(_BASE_DIR, "assets", "fonts", "SubsetSourceHanSansSC-Regular.otf"),
+    r"C:\Windows\Fonts\msyh.ttc",
+    r"C:\Windows\Fonts\simhei.ttf",
+    "/usr/share/fonts/truetype/wqy/wqy-microhei.ttc",
+    "/usr/share/fonts/truetype/noto/NotoSansCJK-Regular.ttc",
+    "/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc",
+    "/usr/share/fonts/truetype/wqy/wqy-zenhei.ttc",
+]
+
+
+def _find_cn_font():
+    for path in CN_FONT_CANDIDATES:
+        if os.path.exists(path):
+            try:
+                font_manager.fontManager.addfont(path)
+                name = font_manager.FontProperties(fname=path).get_name()
+                return path, name
+            except Exception:
+                continue
+    return None, None
+
+
+FONT_PATH, FONT_NAME = _find_cn_font()
+if FONT_NAME:
+    plt.rcParams["font.family"] = FONT_NAME
 plt.rcParams["axes.unicode_minus"] = False
 
 C_BLUE = "#2f6fed"
@@ -371,7 +391,7 @@ def generate_pdf(assessment, client, total, domains, charts, analysis, ability, 
     from reportlab.pdfbase import pdfmetrics
     from reportlab.pdfbase.ttfonts import TTFont
     CN = "Helvetica"
-    if os.path.exists(FONT_PATH):
+    if FONT_PATH and os.path.exists(FONT_PATH):
         try:
             pdfmetrics.registerFont(TTFont("CN", FONT_PATH))
             CN = "CN"
