@@ -1444,6 +1444,32 @@ def handle_exception(e):
     return jsonify({"error": str(e), "type": type(e).__name__}), 500
 
 
+# --- Vercel Serverless 路径修复 ---
+# Vercel rewrite 到 /api/index 后，会把原始路径放在 query string 的 path 参数里，
+# 但 Flask 收到的 PATH_INFO 是 /api/index，导致全站 404。
+# 这里在 WSGI 层把 PATH_INFO 还原为真实路径。
+if os.environ.get("VERCEL"):
+    import urllib.parse
+
+    _flask_app_local = app
+
+    def _vercel_wsgi_app(environ, start_response):
+        path_info = environ.get("PATH_INFO", "")
+        if path_info == "/api/index":
+            qs = environ.get("QUERY_STRING", "")
+            params = urllib.parse.parse_qs(qs)
+            real_path = params.get("path", ["/"])
+            environ["PATH_INFO"] = real_path[0] if isinstance(real_path, list) else real_path
+            # 保留其它 query 参数
+            rest = {k: v for k, v in params.items() if k != "path"}
+            environ["QUERY_STRING"] = "&".join(
+                f"{k}={v[0]}" for k, v in rest.items()
+            )
+        return _flask_app_local(environ, start_response)
+
+    app = _vercel_wsgi_app
+
+
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
     # debug=False：关闭自动重载器，避免重载子进程在沙箱只读命名空间下无法写入数据库
