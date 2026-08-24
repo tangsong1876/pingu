@@ -1437,6 +1437,12 @@ def admin_page():
     return resp
 
 
+@app.route("/favicon.ico")
+def favicon():
+    # 浏览器会自动请求 /favicon.ico，返回空响应避免日志里出现 404/500
+    return Response(status=204)
+
+
 @app.errorhandler(Exception)
 def handle_exception(e):
     import traceback
